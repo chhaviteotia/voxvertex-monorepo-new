@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, Suspense, useRef } from "react";
 import {
   Check,
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   Trash2,
   Plus,
   X as XIcon,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -23,6 +25,8 @@ interface TrainingCategory {
   subtopics: string[];
   samplePrograms: string;
   success: string;
+  imageUrl?: string;
+  imageFile?: File;
 }
 
 interface EditTrainingCategoriesModalProps {
@@ -125,8 +129,11 @@ export default function EditTrainingCategoriesModal({
     subtopics: [],
     samplePrograms: "",
     success: "",
+    imageUrl: "",
   });
   const [newSubtopic, setNewSubtopic] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -169,6 +176,7 @@ export default function EditTrainingCategoriesModal({
       // If we were editing this category, close the form
       if (editingCategory?.title === categoryTitle) {
         setEditingCategory(null);
+        setImagePreview(null);
       }
     } else {
       // Show form in right panel for new category
@@ -180,9 +188,11 @@ export default function EditTrainingCategoriesModal({
         subtopics: [],
         samplePrograms: "",
         success: "",
+        imageUrl: "",
       };
       setFormData(newCategory);
       setEditingCategory(newCategory);
+      setImagePreview(null);
     }
   };
 
@@ -191,6 +201,7 @@ export default function EditTrainingCategoriesModal({
     if (category) {
       setEditingCategory(category);
       setFormData(category);
+      setImagePreview(category.imageUrl || null);
     }
   };
 
@@ -198,14 +209,22 @@ export default function EditTrainingCategoriesModal({
     if (!formData.title.trim() || !formData.experience.trim()) {
       return;
     }
+    // If image file is selected, convert to URL for storage (or keep file for upload)
+    const categoryToSave: TrainingCategory = {
+      ...formData,
+      imageUrl: imagePreview || formData.imageUrl || "",
+    };
+
     setSelectedCategories((prev) => {
       const existingIndex = prev.findIndex((cat) => cat.id === formData.id);
       if (existingIndex >= 0) {
         // Update existing category
-        return prev.map((cat) => (cat.id === formData.id ? formData : cat));
+        return prev.map((cat) =>
+          cat.id === formData.id ? categoryToSave : cat
+        );
       } else {
         // Add new category
-        return [...prev, formData];
+        return [...prev, categoryToSave];
       }
     });
     setEditingCategory(null);
@@ -217,8 +236,10 @@ export default function EditTrainingCategoriesModal({
       subtopics: [],
       samplePrograms: "",
       success: "",
+      imageUrl: "",
     });
     setNewSubtopic("");
+    setImagePreview(null);
   };
 
   const handleCancelEdit = () => {
@@ -242,8 +263,41 @@ export default function EditTrainingCategoriesModal({
       subtopics: [],
       samplePrograms: "",
       success: "",
+      imageUrl: "",
     });
     setNewSubtopic("");
+    setImagePreview(null);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please select a valid image file");
+        return;
+      }
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image size should be less than 5MB");
+        return;
+      }
+      setFormData((prev) => ({ ...prev, imageFile: file }));
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData((prev) => ({ ...prev, imageFile: undefined, imageUrl: "" }));
+    setImagePreview(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
   };
 
   const addSubtopic = () => {
@@ -528,6 +582,64 @@ export default function EditTrainingCategoriesModal({
                           />
                         </div>
 
+                        {/* Image Upload */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Category Image
+                            <span className="text-gray-400 ml-1">
+                              (Optional)
+                            </span>
+                          </label>
+                          <div className="space-y-3">
+                            {imagePreview || formData.imageUrl ? (
+                              <div className="relative">
+                                <img
+                                  src={imagePreview || formData.imageUrl || ""}
+                                  alt="Category preview"
+                                  className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveImage}
+                                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                >
+                                  <XIcon className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => imageInputRef.current?.click()}
+                                className="w-full h-48 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-colors"
+                              >
+                                <ImageIcon className="w-12 h-12 text-gray-400 mb-2" />
+                                <p className="text-sm text-gray-600 mb-1">
+                                  Click to upload image
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  PNG, JPG up to 5MB
+                                </p>
+                              </div>
+                            )}
+                            <input
+                              ref={imageInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageSelect}
+                              className="hidden"
+                            />
+                            {!imagePreview && !formData.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => imageInputRef.current?.click()}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-700"
+                              >
+                                <Upload className="w-4 h-4" />
+                                Choose Image
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Success Stories/Outcomes */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -615,6 +727,16 @@ export default function EditTrainingCategoriesModal({
                                   </button>
                                 </div>
                               </div>
+
+                              {category.imageUrl && (
+                                <div className="mb-3">
+                                  <img
+                                    src={category.imageUrl}
+                                    alt={category.title}
+                                    className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                                  />
+                                </div>
+                              )}
 
                               <p className="text-sm text-gray-600 mb-3">
                                 {category.experience}

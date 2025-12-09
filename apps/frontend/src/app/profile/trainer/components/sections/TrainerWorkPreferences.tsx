@@ -61,7 +61,15 @@ export default function TrainerWorkPreferences() {
   const geographicPreference = workPreferences?.geographicPreference?.[0]
     ? mapGeographicPreference(workPreferences.geographicPreference[0])
     : "";
-  const travelWillingness = workPreferences?.travelDetails || "";
+
+  // Determine travel willingness display based on selection
+  const travelWillingnessValue = workPreferences?.travelWillingness?.[0] || "";
+  const travelWillingness =
+    travelWillingnessValue === "no"
+      ? "No"
+      : travelWillingnessValue === "yes"
+      ? workPreferences?.travelDetails || "Yes, I am willing to travel"
+      : "";
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">

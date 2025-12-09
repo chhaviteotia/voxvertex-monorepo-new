@@ -15,6 +15,8 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useRouter } from "next/navigation";
 import { TrainingCalendar } from "@/store/api/expertApi";
+import { useExpertAuth } from "@/store/hooks/expertAuth";
+import { useGetCurrentExpertQuery } from "@/store/api/expertApi";
 
 interface AvailabilityItem {
   id: string;
@@ -33,6 +35,84 @@ interface EditTrainingCalendarModalProps {
   initialData?: TrainingCalendar;
 }
 
+// Currency conversion rates (1 INR to other currencies)
+const CURRENCY_RATES: Record<
+  string,
+  { code: string; symbol: string; rate: number; name: string }
+> = {
+  US: { code: "USD", symbol: "$", rate: 0.011, name: "US Dollar" },
+  USA: { code: "USD", symbol: "$", rate: 0.011, name: "US Dollar" },
+  "United States": { code: "USD", symbol: "$", rate: 0.011, name: "US Dollar" },
+  "United States of America": {
+    code: "USD",
+    symbol: "$",
+    rate: 0.011,
+    name: "US Dollar",
+  },
+  UK: { code: "GBP", symbol: "£", rate: 0.0095, name: "British Pound" },
+  "United Kingdom": {
+    code: "GBP",
+    symbol: "£",
+    rate: 0.0095,
+    name: "British Pound",
+  },
+  Canada: { code: "CAD", symbol: "C$", rate: 0.015, name: "Canadian Dollar" },
+  Australia: {
+    code: "AUD",
+    symbol: "A$",
+    rate: 0.017,
+    name: "Australian Dollar",
+  },
+  Germany: { code: "EUR", symbol: "€", rate: 0.011, name: "Euro" },
+  France: { code: "EUR", symbol: "€", rate: 0.011, name: "Euro" },
+  Italy: { code: "EUR", symbol: "€", rate: 0.011, name: "Euro" },
+  Spain: { code: "EUR", symbol: "€", rate: 0.011, name: "Euro" },
+  Japan: { code: "JPY", symbol: "¥", rate: 1.7, name: "Japanese Yen" },
+  China: { code: "CNY", symbol: "¥", rate: 0.08, name: "Chinese Yuan" },
+  UAE: { code: "AED", symbol: "د.إ", rate: 0.041, name: "UAE Dirham" },
+  "United Arab Emirates": {
+    code: "AED",
+    symbol: "د.إ",
+    rate: 0.041,
+    name: "UAE Dirham",
+  },
+  Singapore: {
+    code: "SGD",
+    symbol: "S$",
+    rate: 0.015,
+    name: "Singapore Dollar",
+  },
+  // Add more countries as needed
+};
+
+// Get currency info based on country
+const getCurrencyInfo = (country?: string) => {
+  if (!country) return null;
+
+  // Normalize country name for lookup (case-insensitive)
+  const normalizedCountry = country.trim();
+
+  // Try exact match first
+  let currencyInfo = CURRENCY_RATES[normalizedCountry];
+
+  // If not found, try case-insensitive match
+  if (!currencyInfo) {
+    const countryKey = Object.keys(CURRENCY_RATES).find(
+      (key) => key.toLowerCase() === normalizedCountry.toLowerCase()
+    );
+    if (countryKey) {
+      currencyInfo = CURRENCY_RATES[countryKey];
+    }
+  }
+
+  if (currencyInfo) {
+    return currencyInfo;
+  }
+
+  // Default to INR if country not found
+  return { code: "INR", symbol: "₹", rate: 1, name: "Indian Rupee" };
+};
+
 export default function EditTrainingCalendarModal({
   isOpen,
   onClose,
@@ -40,9 +120,16 @@ export default function EditTrainingCalendarModal({
   initialData = [],
 }: EditTrainingCalendarModalProps) {
   const router = useRouter();
+  const { user } = useExpertAuth();
+  const { data: currentUserData } = useGetCurrentExpertQuery();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  // Get user's country for currency conversion
+  const trainerUser = user || currentUserData?.user;
+  const userCountry = trainerUser?.country || "";
+  const currencyInfo = getCurrencyInfo(userCountry);
 
   // Get today's date
   const today = new Date();
@@ -743,7 +830,14 @@ export default function EditTrainingCalendarModal({
                             />
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
-                            1 VoxCoin = ₹1 INR
+                            {currencyInfo && currencyInfo.code !== "INR" ? (
+                              <>
+                                1 VoxCoin = {currencyInfo.rate.toFixed(4)}{" "}
+                                {currencyInfo.name}
+                              </>
+                            ) : (
+                              <>1 VoxCoin = ₹1 INR</>
+                            )}
                           </p>
                         </div>
 

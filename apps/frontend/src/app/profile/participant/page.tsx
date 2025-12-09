@@ -1,6 +1,6 @@
 "use client";
 
-import ProfilePageContent from "@/components/profile/ProfilePageContent";
+import ProfilePageContent from "../components/ProfilePageContent";
 
 /**
  * Participant Profile Page - Optimized with shared component

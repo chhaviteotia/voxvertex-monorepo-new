@@ -27,3 +27,4 @@ router.put("/:userType", authenticateUser, updateProfileController);
 
 export default router;
 
+

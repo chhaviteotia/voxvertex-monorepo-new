@@ -31,19 +31,70 @@ export default function EditContactInfoModal({
   },
 }: EditContactInfoModalProps) {
   const [formData, setFormData] = useState<ContactInfoData>(initialData);
+  const [websiteError, setWebsiteError] = useState<string>("");
 
   // Update local state when initialData changes or modal opens
   React.useEffect(() => {
     if (isOpen) {
       setFormData(initialData);
+      setWebsiteError(""); // Clear errors when modal opens
     }
   }, [initialData, isOpen]);
 
+  // Validate website URL
+  const validateWebsite = (url: string): boolean => {
+    if (!url || url.trim() === "") {
+      setWebsiteError(""); // Empty is allowed (optional field)
+      return true;
+    }
+
+    // Add protocol if missing
+    let urlToValidate = url.trim();
+    if (!urlToValidate.match(/^https?:\/\//i)) {
+      urlToValidate = `https://${urlToValidate}`;
+    }
+
+    try {
+      const urlObj = new URL(urlToValidate);
+      // Check if it's a valid HTTP/HTTPS URL
+      if (!["http:", "https:"].includes(urlObj.protocol)) {
+        setWebsiteError(
+          "Please enter a valid website URL (http:// or https://)"
+        );
+        return false;
+      }
+      // Check if hostname is valid (has at least one dot or is localhost)
+      if (
+        !urlObj.hostname ||
+        (!urlObj.hostname.includes(".") && urlObj.hostname !== "localhost")
+      ) {
+        setWebsiteError("Please enter a valid website address");
+        return false;
+      }
+      setWebsiteError("");
+      return true;
+    } catch (error) {
+      setWebsiteError(
+        "Please enter a valid website address (e.g., www.example.com or example.com)"
+      );
+      return false;
+    }
+  };
+
   const handleChange = (field: keyof ContactInfoData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+
+    // Validate website in real-time
+    if (field === "website") {
+      validateWebsite(value);
+    }
   };
 
   const handleSave = () => {
+    // Validate website before saving
+    if (!validateWebsite(formData.website)) {
+      return; // Don't save if validation fails
+    }
     onSave(formData);
     onClose();
   };
@@ -126,13 +177,26 @@ export default function EditContactInfoModal({
               <div className="relative">
                 <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 <input
-                  type="url"
+                  type="text"
                   value={formData.website}
                   onChange={(e) => handleChange("website", e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-                  placeholder="www.example.com"
+                  onBlur={(e) => validateWebsite(e.target.value)}
+                  className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none ${
+                    websiteError
+                      ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                      : "border-gray-300"
+                  }`}
+                  placeholder="www.example.com or example.com"
                 />
               </div>
+              {websiteError && (
+                <p className="mt-1 text-sm text-red-600">{websiteError}</p>
+              )}
+              {!websiteError && formData.website && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Valid website address
+                </p>
+              )}
             </div>
 
             {/* LinkedIn Profile */}
@@ -175,7 +239,12 @@ export default function EditContactInfoModal({
         <div className="bg-gray-100 px-6 py-4 flex items-center gap-3 border-t border-gray-200 shrink-0">
           <button
             onClick={handleSave}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium shadow-sm"
+            disabled={!!websiteError}
+            className={`flex-1 flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg transition-colors font-medium shadow-sm ${
+              websiteError
+                ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                : "bg-teal-600 text-white hover:bg-teal-700"
+            }`}
           >
             <Check className="w-5 h-5" />
             Save Changes

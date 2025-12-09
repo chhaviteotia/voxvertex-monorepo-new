@@ -353,3 +353,4 @@ export const resendOtp = async (identifier, type, fullName = null, userType = 'e
   }
 };
 
+

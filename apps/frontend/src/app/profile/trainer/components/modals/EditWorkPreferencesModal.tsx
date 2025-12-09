@@ -99,12 +99,12 @@ export default function EditAvailabilityPreferencesModal({
     }));
   };
 
-  const toggleTravelWillingness = (value: string) => {
+  const setTravelWillingness = (value: string) => {
     setFormData((prev) => ({
       ...prev,
-      travelWillingness: prev.travelWillingness.includes(value)
-        ? prev.travelWillingness.filter((item) => item !== value)
-        : [...prev.travelWillingness, value],
+      travelWillingness: [value], // Only allow one selection at a time
+      // Clear travel details if "No" is selected
+      travelDetails: value === "no" ? "" : prev.travelDetails,
     }));
   };
 
@@ -360,16 +360,17 @@ export default function EditAvailabilityPreferencesModal({
                           className="flex items-center gap-3 cursor-pointer"
                         >
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="travelWillingness"
                             checked={formData.travelWillingness.includes(
                               option.value
                             )}
                             onChange={(e) => {
                               e.stopPropagation();
-                              toggleTravelWillingness(option.value);
+                              setTravelWillingness(option.value);
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-5 h-5 text-teal-600 focus:ring-teal-500 focus:ring-2 border-gray-300 rounded cursor-pointer"
+                            className="w-5 h-5 text-teal-600 focus:ring-teal-500 focus:ring-2 border-gray-300 cursor-pointer"
                           />
                           <span className="text-sm text-gray-700">
                             {option.label}

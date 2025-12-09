@@ -14,6 +14,8 @@ import {
   Settings,
   Bell,
   LogOut,
+  SquarePen,
+  BookOpen,
 } from "lucide-react";
 import { useExpertAuth } from "@/store/hooks/expertAuth";
 import { useGetCurrentExpertQuery } from "@/store/api/expertApi";
@@ -99,6 +101,19 @@ export default function Sidebar() {
       label: "AI Tech Readiness",
       href: "/readiness_testing/trainer",
       active: currentPath.startsWith("/readiness_testing"),
+    },
+    {
+      icon: SquarePen,
+      label: "Post",
+      href: "/posts",
+      active: currentPath === "/posts" || currentPath.startsWith("/posts"),
+    },
+    {
+      icon: BookOpen,
+      label: "Resources",
+      href: "/resources",
+      active:
+        currentPath === "/resources" || currentPath.startsWith("/resources"),
     },
   ];
 
@@ -188,5 +203,3 @@ export default function Sidebar() {
     </div>
   );
 }
-
-

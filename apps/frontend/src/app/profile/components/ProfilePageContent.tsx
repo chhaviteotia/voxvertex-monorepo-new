@@ -2,39 +2,33 @@
 
 import React, { Suspense, ComponentType, ReactNode } from "react";
 import dynamic from "next/dynamic";
-import AboutUser from "@/components/profile/sections/AboutUser";
-import WorkExperience from "@/components/profile/sections/WorkExperience";
-import Education from "@/components/profile/sections/Education";
-import AwardsAndCertifications from "@/components/profile/sections/AwardsAndCertifications";
-import FeaturedVideos from "@/components/profile/sections/FeaturedVideos";
-import Skills from "@/components/profile/sections/Skills";
-import ProfileStats from "@/components/profile/sections/ProfileStats";
-import Reviews from "@/components/profile/sections/Reviews";
+import AboutUser from "./sections/AboutUser";
+import WorkExperience from "./sections/WorkExperience";
+import Education from "./sections/Education";
+import AwardsAndCertifications from "./sections/AwardsAndCertifications";
+import FeaturedVideos from "./sections/FeaturedVideos";
+import Skills from "./sections/Skills";
+import ProfileStats from "./sections/ProfileStats";
+import Reviews from "./sections/Reviews";
 
 // Dynamic imports for role-specific components
-const Calendar = dynamic(
-  () => import("@/components/profile/sections/Calendar/index"),
-  {
-    loading: () => (
-      <div className="w-full h-96 bg-white shadow-lg rounded-2xl animate-pulse flex items-center justify-center">
-        <p className="text-gray-500">Loading Calendar...</p>
-      </div>
-    ),
-    ssr: false,
-  }
-);
+const Calendar = dynamic(() => import("./sections/Calendar/index"), {
+  loading: () => (
+    <div className="w-full h-96 bg-white shadow-lg rounded-2xl animate-pulse flex items-center justify-center">
+      <p className="text-gray-500">Loading Calendar...</p>
+    </div>
+  ),
+  ssr: false,
+});
 
-const Posts = dynamic(
-  () => import("@/components/profile/sections/Posts/index"),
-  {
-    loading: () => (
-      <div className="w-full h-64 bg-gray-100 animate-pulse rounded-lg flex items-center justify-center">
-        <p className="text-gray-500">Loading Posts...</p>
-      </div>
-    ),
-    ssr: false,
-  }
-);
+const Posts = dynamic(() => import("./sections/Posts/index"), {
+  loading: () => (
+    <div className="w-full h-64 bg-gray-100 animate-pulse rounded-lg flex items-center justify-center">
+      <p className="text-gray-500">Loading Posts...</p>
+    </div>
+  ),
+  ssr: false,
+});
 
 // Loading skeleton component
 const LoadingSkeleton = ({ height = "h-48" }: { height?: string }) => (

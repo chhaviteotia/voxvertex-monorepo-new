@@ -39,7 +39,7 @@ const TimezoneInfo = dynamic(() => import("./TimezoneInfo"), {
 });
 
 const AvailabilityModal = dynamic(
-  () => import("@/components/profile/modals/AvailabilityModal"),
+  () => import("../../modals/AvailabilityModal"),
   {
     loading: () => null, // Modal doesn't need loading state when closed
     ssr: false,

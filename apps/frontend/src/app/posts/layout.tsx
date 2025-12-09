@@ -6,11 +6,10 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 
 /**
- * Trainer Profile Layout - Clean layout matching the UI design
- * Sidebar on left, simple top header, content on right
- * Fully responsive
+ * Posts Layout - Shared layout for posts page
+ * Sidebar on left, header on top, content on right
  */
-export default function TrainerProfileLayout({
+export default function PostsLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -52,21 +51,15 @@ export default function TrainerProfileLayout({
 
         {/* Main Content Area */}
         <div className="flex-1 w-full lg:ml-64 min-h-screen">
-          {/* Top Header Bar - Matching the image design */}
+          {/* Top Header Bar */}
           <Header
-            title={
-              pathname?.includes("/posts")
-                ? "Posts"
-                : pathname?.includes("/resources")
-                ? "Resources"
-                : "Profile"
-            }
+            title="Posts"
             showMobileMenu={showMobileSidebar}
             onMobileMenuToggle={() => setShowMobileSidebar(true)}
           />
 
-          {/* Content with top margin for header */}
-          <main className="mt-16 p-4 sm:p-6 lg:p-8">{children}</main>
+          {/* Content with top margin for header - Full width after sidebar */}
+          <main className="mt-16 p-6">{children}</main>
         </div>
       </div>
     </div>
