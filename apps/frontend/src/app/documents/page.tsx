@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import { useGetUserEventsQuery } from "@/store/api/eventApi";
 import { Loader2 } from "lucide-react";

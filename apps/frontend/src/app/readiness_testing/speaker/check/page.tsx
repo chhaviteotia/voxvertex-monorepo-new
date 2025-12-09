@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Wifi, Mic, Headphones, MonitorCheck, Camera } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 
 const contentWrapperClasses =

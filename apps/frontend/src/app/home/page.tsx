@@ -35,7 +35,7 @@ export default function HomePage() {
           {/* Navigation Links */}
           <nav className="hidden items-center gap-6 md:flex">
             <Link
-              href="#"
+              href="/community"
               className="text-sm font-medium text-gray-700 transition-colors hover:text-teal-600"
             >
               Community
@@ -66,7 +66,7 @@ export default function HomePage() {
               Find Experts
             </button>
             <Link
-              href="/join-expert"
+              href="/signup/expert"
               className="hidden rounded-lg border-2 border-teal-500 bg-white px-4 py-2 text-sm font-medium text-teal-600 transition-colors hover:bg-teal-50 sm:block"
             >
               Join as an Expert

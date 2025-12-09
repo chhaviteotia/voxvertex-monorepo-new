@@ -43,10 +43,9 @@ const connectDB = async () => {
     console.log('Port:', mongoose.connection.port || 'N/A (Atlas)');
   } catch (error) {
     isConnected = false;
-    console.error('❌ MongoDB connection error:', error.message);
-    console.error('Error code:', error.code);
+    console.error('\n❌ MongoDB connection error:', error.message);
     
-    // Provide helpful error messages
+    // Provide helpful error messages with specific fix steps
     if (error.code === 'ENOTFOUND' || error.message.includes('ENOTFOUND')) {
       console.error('\n💡 DNS Resolution Issue:');
       console.error('   - The hostname in your connection string cannot be resolved');
@@ -56,15 +55,34 @@ const connectDB = async () => {
       console.error('     mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/database');
     } else if (error.message.includes('authentication failed') || error.code === 8000) {
       console.error('\n💡 Authentication Issue:');
-      console.error('   - Check your MongoDB username and password');
+      console.error('   - Check your MongoDB username and password in .env file');
+      console.error('   - Verify credentials in MongoDB Atlas dashboard');
       console.error('   - For MongoDB Atlas, make sure your IP is whitelisted');
-      console.error('   - Go to: Security → Network Access → Add IP Address');
-    } else if (error.message.includes('buffering timed out')) {
-      console.error('\n💡 Connection Timeout:');
-      console.error('   - MongoDB server is not reachable');
-      console.error('   - Check your connection string format');
-      console.error('   - Verify network access is configured in Atlas');
-      console.error('   - Check if MongoDB service is running (for local)');
+      console.error('   - Go to: Atlas → Security → Network Access → Add IP Address');
+      console.error('   - Quick fix: Add 0.0.0.0/0 to allow all IPs (development only)');
+    } else if (error.message.includes('buffering timed out') || error.message.includes('Could not connect')) {
+      console.error('\n💡 Connection Timeout / Network Access Issue:');
+      console.error('   - MongoDB Atlas is blocking your IP address');
+      console.error('   - SOLUTION: Whitelist your IP in MongoDB Atlas');
+      console.error('');
+      console.error('   📋 Steps to fix:');
+      console.error('   1. Go to: https://cloud.mongodb.com/');
+      console.error('   2. Select your project → Security → Network Access');
+      console.error('   3. Click "Add IP Address"');
+      console.error('   4. Click "Add Current IP Address" (or manually add your IP)');
+      console.error('   5. For development: You can temporarily use 0.0.0.0/0 (allows all IPs)');
+      console.error('   6. Wait 1-2 minutes for changes to propagate');
+      console.error('   7. Restart your backend server');
+      console.error('');
+      console.error('   🔍 To find your current IP:');
+      console.error('   - Visit: https://whatismyipaddress.com/');
+      console.error('   - Or check the error message above for your IP');
+    } else {
+      console.error('\n💡 General Connection Issue:');
+      console.error('   - Check your MONGODB_URI in .env file');
+      console.error('   - Verify the connection string format');
+      console.error('   - Ensure MongoDB service is running (for local)');
+      console.error('   - For MongoDB Atlas: Check network access settings');
     }
     
     // Don't exit in development - allow server to continue

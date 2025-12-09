@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";
@@ -36,6 +36,17 @@ export default function ProfileLayout({
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+
+  // Check if this is a trainer profile route - if so, don't render UnifiedHeader/Sidebar
+  // The trainer layout will handle its own header and sidebar
+  const isTrainerRoute =
+    pathname?.startsWith("/profile/trainer") ||
+    pathname?.startsWith("/profile/speaker");
+
+  // If it's a trainer route, just render children (trainer layout will handle everything)
+  if (isTrainerRoute) {
+    return <>{children}</>;
+  }
 
   const contentWrapperClasses =
     "ml-0 sm:ml-[18rem] md:ml-[19.5rem] lg:ml-[21.5rem] mr-0 sm:mr-[2.5rem] md:mr-[3rem] lg:mr-[3.5rem]";

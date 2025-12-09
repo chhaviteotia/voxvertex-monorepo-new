@@ -4,17 +4,11 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import authRoutes from './auth/routes/authRoutes.js';
+import userRoutes from './user/routes/userRoutes.js';
 import profileRoutes from './profile/routes/profileRoutes.js';
-import postRoutes from './post/routes/postRoutes.js';
-import availabilityRoutes from './availability/routes/availabilityRoutes.js';
-import disputeRoutes from './dispute/routes/disputeRoutes.js';
-import eventRoutes from './event/routes/eventRoutes.js';
-import documentRoutes from './document/routes/documentRoutes.js';
-import bookingRoutes from './booking/routes/bookingRoutes.js';
-import expertRoutes from './user/routes/expertRoutes.js';
 import connectDB from './configs/dbConnect.js';
 import { connectCloudinary } from './configs/cloudinary.config.js';
+import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
 // Load environment variables
 dotenv.config();
@@ -51,32 +45,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-app.use('/api/auth', authRoutes);
+// Unified user routes (supports expert, organiser, participant)
+// Routes: /api/user/:userType/*
+app.use('/api/user', userRoutes);
+
+// Profile routes (supports expert, organiser, participant)
+// Routes: /api/profile/:userType/*
 app.use('/api/profile', profileRoutes);
-app.use('/api/post', postRoutes);
-app.use('/api/availability', availabilityRoutes);
-app.use('/api/dispute', disputeRoutes);
-app.use('/api/event', eventRoutes);
-app.use('/api/document', documentRoutes);
-app.use('/api/booking', bookingRoutes);
-app.use('/api/user/expert', expertRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal server error'
-  });
-});
+// 404 handler (must be before error handler)
+app.use(notFoundHandler);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
-});
+// Error handling middleware (must be last)
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {

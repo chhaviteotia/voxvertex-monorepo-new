@@ -1,6 +1,6 @@
 import ExpertOtp from "../models/expertOtp.js";
 import redis from "../../configs/redis.config.js";
-import { redisAvailable } from "../../configs/redis.config.js";
+import { redisAvailable, isRedisReady } from "../../configs/redis.config.js";
 import { sendEmailVerification } from "../../services/email.service.js";
 import { sendPhoneOtpSMS } from "../../services/sms.service.js";
 import { twilioAvailable } from "../../configs/twilio.config.js";
@@ -19,7 +19,9 @@ export const generateOtp = () => {
 };
 
 /**
- * Store OTP in Redis or MongoDB
+ * Store OTP in Redis (PRIMARY - traditional approach) with MongoDB backup
+ * Redis is the primary storage for OTPs (fast, TTL support, designed for ephemeral data)
+ * MongoDB is optional backup/audit log
  */
 export const storeOtp = async (identifier, type, otp, expiresInMinutes = 10) => {
   // Normalize identifier: lowercase for email, remove non-digits for phone
@@ -29,55 +31,78 @@ export const storeOtp = async (identifier, type, otp, expiresInMinutes = 10) => 
   
   const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
   const key = `expert:otp:${type}:${normalizedIdentifier}`;
+  const otpString = String(otp); // Ensure OTP is string
 
-  try {
-    // Try Redis first
-    if (redisAvailable && redis) {
+  // Step 1: Store in Redis FIRST (PRIMARY - traditional approach)
+  const redisReady = await isRedisReady();
+  if (redisReady && redis) {
+    try {
       const otpData = {
-        otp,
+        otp: otpString,
         expiresAt: expiresAt.toISOString(),
         attempts: 0,
         verified: false,
       };
+      
+      // Use Redis SETEX for automatic expiration (traditional OTP storage)
       await redis.setex(key, expiresInMinutes * 60, JSON.stringify(otpData));
+      console.log(`✅ OTP stored in Redis (PRIMARY) for ${normalizedIdentifier} (${type}): ${otpString}`);
+      
+      // Step 2: Also store in MongoDB as backup/audit (non-blocking)
+      storeInMongoDB(normalizedIdentifier, type, otpString, expiresAt).catch(err => {
+        console.warn("⚠️ MongoDB backup storage failed (non-critical):", err.message);
+      });
+      
       return { stored: true, method: "redis" };
+    } catch (error) {
+      console.error("❌ Redis OTP storage failed:", error.message);
+      // Fall through to MongoDB fallback
     }
-  } catch (error) {
-    console.warn("Redis storage failed, falling back to MongoDB:", error.message);
+  } else {
+    console.warn("⚠️ Redis not available, falling back to MongoDB");
   }
 
-  // Fallback to MongoDB
+  // Step 3: Fallback to MongoDB if Redis failed or unavailable
   try {
-    // Invalidate previous OTPs for this identifier and type
-    await ExpertOtp.updateMany(
-      {
-        [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
-        type,
-        verified: false,
-      },
-      { verified: true } // Mark as verified to invalidate
-    );
-
-    // Create new OTP
-    const otpData = {
-      [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
-      type,
-      otp,
-      expiresAt,
-      verified: false,
-      attempts: 0,
-    };
-
-    await ExpertOtp.create(otpData);
+    await storeInMongoDB(normalizedIdentifier, type, otpString, expiresAt);
+    console.log(`✅ OTP stored in MongoDB (FALLBACK) for ${normalizedIdentifier} (${type}): ${otpString}`);
     return { stored: true, method: "mongodb" };
   } catch (error) {
-    console.error("MongoDB OTP storage failed:", error);
-    throw new Error("Failed to store OTP");
+    console.error("❌ MongoDB OTP storage failed:", error.message);
+    throw new Error(`Failed to store OTP: ${error.message}`);
   }
 };
 
 /**
- * Verify OTP from Redis or MongoDB
+ * Helper function to store OTP in MongoDB (for backup/audit)
+ */
+const storeInMongoDB = async (normalizedIdentifier, type, otpString, expiresAt) => {
+  // Invalidate previous OTPs for this identifier and type
+  await ExpertOtp.updateMany(
+    {
+      [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
+      type,
+      verified: false,
+    },
+    { verified: true } // Mark as verified to invalidate
+  );
+
+  // Create new OTP in MongoDB
+  const otpData = {
+    [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
+    type,
+    otp: otpString,
+    expiresAt,
+    verified: false,
+    attempts: 0,
+  };
+
+  await ExpertOtp.create(otpData);
+};
+
+/**
+ * Verify OTP from Redis (PRIMARY) or MongoDB (FALLBACK)
+ * Redis is primary - traditional approach for OTP verification
  */
 export const verifyOtp = async (identifier, type, otp) => {
   // Normalize identifier: lowercase for email, remove non-digits for phone
@@ -85,43 +110,92 @@ export const verifyOtp = async (identifier, type, otp) => {
     ? identifier.toLowerCase().trim() 
     : identifier.replace(/\D/g, "");
   
+  // Ensure OTP is a string for consistent comparison
+  const otpString = String(otp).trim();
   const key = `expert:otp:${type}:${normalizedIdentifier}`;
 
-  try {
-    // Try Redis first
-    if (redisAvailable && redis) {
+  console.log(`🔐 Verifying OTP for ${normalizedIdentifier} (${type}), OTP: ${otpString}`);
+
+  // Step 1: Check Redis FIRST (PRIMARY - traditional approach)
+  const redisReady = await isRedisReady();
+  if (redisReady && redis) {
+    try {
       const data = await redis.get(key);
       if (data) {
         const otpData = JSON.parse(data);
-        if (otpData.otp === otp && new Date(otpData.expiresAt) > new Date()) {
+        const storedOtp = String(otpData.otp).trim();
+        
+        console.log(`📦 Found OTP in Redis: stored=${storedOtp}, provided=${otpString}, match=${storedOtp === otpString}`);
+        
+        if (storedOtp === otpString && new Date(otpData.expiresAt) > new Date()) {
           if (otpData.attempts >= 5) {
             throw new Error("Maximum verification attempts exceeded");
           }
-          // Mark as verified by deleting from Redis
+          
+          // Valid OTP - delete from Redis and optionally mark in MongoDB
           await redis.del(key);
+          
+          // Optionally mark in MongoDB if it exists (non-blocking)
+          try {
+            await ExpertOtp.updateMany(
+              {
+                [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
+                type,
+                otp: otpString,
+                verified: false,
+              },
+              { verified: true }
+            );
+          } catch (mongoError) {
+            // Non-critical - OTP already verified in Redis
+            console.warn("MongoDB update failed (non-critical):", mongoError.message);
+          }
+          
+          console.log(`✅ OTP verified successfully via Redis for ${normalizedIdentifier}`);
           return { verified: true, method: "redis" };
-        } else if (otpData.otp !== otp) {
-          // Increment attempts
+        } else if (storedOtp !== otpString) {
+          // Invalid OTP - increment attempts
           otpData.attempts += 1;
-          await redis.setex(key, Math.floor((new Date(otpData.expiresAt) - new Date()) / 1000), JSON.stringify(otpData));
+          const ttl = Math.floor((new Date(otpData.expiresAt) - new Date()) / 1000);
+          if (ttl > 0) {
+            await redis.setex(key, ttl, JSON.stringify(otpData));
+          }
+          
+          // Also increment in MongoDB (non-blocking)
+          try {
+            const existingRecord = await ExpertOtp.findOne({
+              [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
+              type,
+              verified: false,
+              expiresAt: { $gt: new Date() },
+            });
+            if (existingRecord) {
+              await existingRecord.incrementAttempts();
+            }
+          } catch (mongoError) {
+            console.warn("Failed to increment attempts in MongoDB:", mongoError.message);
+          }
+          
           throw new Error("Invalid OTP");
         } else {
           throw new Error("OTP has expired");
         }
       }
+    } catch (error) {
+      if (error.message.includes("Invalid OTP") || error.message.includes("expired") || error.message.includes("Maximum")) {
+        throw error;
+      }
+      console.warn("⚠️ Redis verification failed, checking MongoDB:", error.message);
     }
-  } catch (error) {
-    if (error.message.includes("Invalid OTP") || error.message.includes("expired") || error.message.includes("Maximum")) {
-      throw error;
-    }
-    console.warn("Redis verification failed, falling back to MongoDB:", error.message);
   }
 
-  // Fallback to MongoDB
+  // Step 2: Fallback to MongoDB if Redis failed or unavailable
   try {
-    const otpRecord = await ExpertOtp.findValidOtp(normalizedIdentifier, type, otp);
+    console.log(`🔍 Checking MongoDB (FALLBACK) for OTP: ${normalizedIdentifier} (${type}), OTP: ${otpString}`);
+    
+    const otpRecord = await ExpertOtp.findValidOtp(normalizedIdentifier, type, otpString);
     if (!otpRecord) {
-      // Try to find the record to increment attempts
+      // Try to find the record to increment attempts or provide better error
       const existingRecord = await ExpertOtp.findOne({
         [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
         type,
@@ -130,15 +204,43 @@ export const verifyOtp = async (identifier, type, otp) => {
       });
 
       if (existingRecord) {
+        console.log(`❌ OTP mismatch: stored=${existingRecord.otp}, provided=${otpString}`);
         await existingRecord.incrementAttempts();
         throw new Error("Invalid OTP");
       }
-      throw new Error("OTP not found or expired");
+      
+      // Check if there's an expired record
+      const expiredRecord = await ExpertOtp.findOne({
+        [type === "email" ? "email" : "phoneNumber"]: normalizedIdentifier,
+        type,
+        verified: false,
+      });
+      
+      if (expiredRecord) {
+        console.log(`❌ OTP found but expired: expiresAt=${expiredRecord.expiresAt}, now=${new Date()}`);
+        throw new Error("OTP has expired");
+      }
+      
+      console.log(`❌ No OTP found for ${normalizedIdentifier} (${type})`);
+      throw new Error("OTP not found. Please request a new OTP.");
     }
 
+    // Valid OTP found in MongoDB - mark as verified
     await otpRecord.markAsVerified();
+    
+    // Also delete from Redis if it exists
+    if (redis && redisReady) {
+      try {
+        await redis.del(key);
+      } catch (redisError) {
+        console.warn("Failed to delete from Redis after MongoDB verification:", redisError.message);
+      }
+    }
+    
+    console.log(`✅ OTP verified successfully via MongoDB (FALLBACK) for ${normalizedIdentifier}`);
     return { verified: true, method: "mongodb" };
   } catch (error) {
+    console.error(`❌ OTP verification failed:`, error.message);
     throw error;
   }
 };

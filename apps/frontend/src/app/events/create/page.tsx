@@ -8,7 +8,7 @@ import BrandingContentStep from "./components/steps/BrandingContentStep";
 import TicketingStep from "./components/steps/TicketingStep";
 import PoliciesStep from "./components/steps/PoliciesStep";
 import ReviewPublishStep from "./components/steps/ReviewPublishStep";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";

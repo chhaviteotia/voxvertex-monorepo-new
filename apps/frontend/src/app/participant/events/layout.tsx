@@ -3,7 +3,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import { useEffect, Suspense } from "react";
 import { usePathname } from "next/navigation";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";

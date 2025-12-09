@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import Sidebar from "@/components/layout/Sidebar";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import SpeakerDatabasePage from "./components/SpeakerDatabase";
 import SpeakerManagementPage from "./components/SpeakerManagement";
 import DocumentsPage from "./components/Documents";

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import { Calendar, CheckCircle2Icon, DownloadIcon, Redo2 } from "lucide-react";
 import { BiNotification } from "react-icons/bi";

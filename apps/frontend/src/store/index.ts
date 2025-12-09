@@ -9,6 +9,7 @@ import "./api/privacyApi";
 import "./api/accountApi";
 import "./api/bookingApi";
 import "./api/expertApi";
+import "./api/organiserApi";
 
 export const store = configureStore({
   reducer: {

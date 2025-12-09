@@ -12,7 +12,7 @@ import {
   Check,
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import { useDeleteAccountMutation } from "@/store/api/accountApi";
 import { useAuth } from "@/store/hooks";
 import { useRouter } from "next/navigation";

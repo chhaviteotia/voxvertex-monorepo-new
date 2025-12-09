@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { useGetEventByIdQuery } from "@/store/api/eventApi";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import Sidebar from "@/components/layout/Sidebar";
 import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import type { Event } from "@/types/event";

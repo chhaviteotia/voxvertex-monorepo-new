@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { CheckCircle } from "lucide-react";
 import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import Sidebar from "@/components/layout/Sidebar";
-import UnifiedHeader from "@/components/layout/UnifiedHeader";
+import UnifiedHeader from "@/components/UnifiedHeader";
 import Overview from "./components/Overview";
 import Transactions from "./components/Transactions";
 import Subscription from "./components/Subscription";
