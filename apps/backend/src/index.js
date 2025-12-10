@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import userRoutes from './user/routes/userRoutes.js';
 import profileRoutes from './profile/routes/profileRoutes.js';
+import postRoutes from './posts/routes/postRoutes.js';
 import connectDB from './configs/dbConnect.js';
 import { connectCloudinary } from './configs/cloudinary.config.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
@@ -52,6 +53,10 @@ app.use('/api/user', userRoutes);
 // Profile routes (supports expert, organiser, participant)
 // Routes: /api/profile/:userType/*
 app.use('/api/profile', profileRoutes);
+
+// Post routes
+// Routes: /api/posts/*
+app.use('/api/posts', postRoutes);
 
 // 404 handler (must be before error handler)
 app.use(notFoundHandler);

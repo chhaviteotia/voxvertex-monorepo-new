@@ -10,16 +10,28 @@ import { getUserByEmail } from '../services/user.service.js';
  */
 export const authenticateUser = async (req, res, next) => {
   try {
-    // Extract userType from route params
+    // Extract userType from route params (if available)
     const userType = req.params.userType || 'expert';
     
-    // Get token from header or cookies
-    const token = req.header('Authorization')?.replace('Bearer ', '') || 
-                  req.cookies?.[`${userType}AccessToken`];
+    // Get token from header first (works for all user types)
+    let token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    // If no header token, try cookies - check all possible user types
+    if (!token) {
+      token = req.cookies?.[`${userType}AccessToken`] ||
+              req.cookies?.expertAccessToken ||
+              req.cookies?.organiserAccessToken ||
+              req.cookies?.participantAccessToken ||
+              req.cookies?.accessToken;
+    }
 
     if (!token) {
       // Try refresh token if access token is not available
-      const refreshToken = req.cookies?.[`${userType}RefreshToken`];
+      const refreshToken = req.cookies?.[`${userType}RefreshToken`] ||
+                          req.cookies?.expertRefreshToken ||
+                          req.cookies?.organiserRefreshToken ||
+                          req.cookies?.participantRefreshToken ||
+                          req.cookies?.refreshToken;
       
       if (refreshToken) {
         try {
@@ -77,24 +89,27 @@ export const authenticateUser = async (req, res, next) => {
         });
       }
 
-      // Verify user type matches (if specified in route)
-      if (userType === 'expert' && !["speaker", "trainer"].includes(user.role)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Invalid user type for this endpoint'
-        });
-      }
-      if (userType === 'organiser' && user.role !== 'organiser') {
-        return res.status(403).json({
-          success: false,
-          message: 'Invalid user type for this endpoint'
-        });
-      }
-      if (userType === 'participant' && user.role !== 'participant') {
-        return res.status(403).json({
-          success: false,
-          message: 'Invalid user type for this endpoint'
-        });
+      // Verify user type matches (if specified in route and not default)
+      // Only check if userType is explicitly in params (not default 'expert')
+      if (req.params.userType) {
+        if (userType === 'expert' && !["speaker", "trainer"].includes(user.role)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid user type for this endpoint'
+          });
+        }
+        if (userType === 'organiser' && user.role !== 'organiser') {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid user type for this endpoint'
+          });
+        }
+        if (userType === 'participant' && user.role !== 'participant') {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid user type for this endpoint'
+          });
+        }
       }
 
       // Attach user to request

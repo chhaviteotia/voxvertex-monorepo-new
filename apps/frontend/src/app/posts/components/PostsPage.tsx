@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -13,10 +13,24 @@ import {
   ArrowUpDown,
   Download,
   ArrowLeft,
+  ChevronDown,
+  Image,
+  Video,
+  Trophy,
+  Lightbulb,
+  Calendar,
 } from "lucide-react";
 import PostCreateInput from "./PostCreateInput";
 import PostCard from "./PostCard";
 import CreatePostModal from "./CreatePostModal";
+import {
+  useGetPostStatsQuery,
+  useGetUserPostsQuery,
+  useCreatePostMutation,
+  type Post,
+} from "@/store/api/postsApi";
+import { useExpertAuth } from "@/store/hooks/expertAuth";
+import { formatRelativeTime } from "@/utils/timeUtils";
 
 interface PostsPageProps {
   user: any;
@@ -29,6 +43,12 @@ export default function PostsPage({ user }: PostsPageProps) {
   );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPostType, setSelectedPostType] = useState<string | null>(null);
+  const [showTypeFilter, setShowTypeFilter] = useState(false);
+  const [sortOrder, setSortOrder] = useState<
+    "recent" | "oldest" | "mostLiked" | "mostViewed" | "mostEngaged"
+  >("recent");
+  const [showSortFilter, setShowSortFilter] = useState(false);
 
   // Helper function to get user initials
   const getUserInitials = (name?: string): string => {
@@ -63,131 +83,190 @@ export default function PostsPage({ user }: PostsPageProps) {
 
   const authorInfo = getAuthorInfo();
 
-  // Mock data - will be replaced with actual API calls
-  const stats = {
-    totalPosts: 8,
-    totalLikes: 3388,
-    totalViews: 45104,
-    engagement: 4824,
+  // API calls
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    refetch: refetchStats,
+  } = useGetPostStatsQuery();
+  const {
+    data: publishedPostsData,
+    isLoading: postsLoading,
+    refetch: refetchPosts,
+  } = useGetUserPostsQuery({ status: "published" });
+  const { data: draftPostsData, isLoading: draftsLoading } =
+    useGetUserPostsQuery({ status: "draft" });
+  const { data: allPostsData, isLoading: allPostsLoading } =
+    useGetUserPostsQuery({
+      status: "published",
+      limit: 50,
+      type: selectedPostType || undefined,
+      search: searchTerm || undefined,
+      sortBy: sortOrder,
+    });
+  const [createPost, { isLoading: isCreatingPost }] = useCreatePostMutation();
+
+  // Map post type to badge
+  const getBadgeFromType = (
+    type: string
+  ): { badge: string; badgeColor: "green" | "blue" | "orange" | "purple" } => {
+    const badgeMap: Record<
+      string,
+      { badge: string; badgeColor: "green" | "blue" | "orange" | "purple" }
+    > = {
+      article: { badge: "Article", badgeColor: "blue" },
+      image: { badge: "Image", badgeColor: "orange" },
+      video: { badge: "Video", badgeColor: "purple" },
+      celebrate: { badge: "Celebrate", badgeColor: "green" },
+      insight: { badge: "Insight", badgeColor: "orange" },
+      event: { badge: "Event", badgeColor: "purple" },
+    };
+    return badgeMap[type] || { badge: "Post", badgeColor: "green" };
   };
 
-  const posts = [
-    {
-      id: "1",
-      author: {
-        ...authorInfo,
-      },
-      timestamp: "2 hours ago",
-      badge: "Achievement",
-      badgeColor: "green",
-      content: `Just wrapped up a 3-day intensive leadership workshop with an amazing group of executives! 🎯
+  // Transform API data to component format
+  const transformPost = (apiPost: Post) => {
+    const authorInitials = getUserInitials(apiPost.author.fullName);
+    const badgeInfo = apiPost.badge
+      ? { badge: apiPost.badge, badgeColor: apiPost.badgeColor }
+      : getBadgeFromType(apiPost.type);
 
-The key highlight? We explored how AI is reshaping leadership paradigms. The discussions were incredibly insightful, and I'm excited to see how these leaders will apply these learnings in their organizations.`,
-      hashtags: ["#Leadership", "#AI", "#Workshop"],
-      metrics: {
-        views: 1234,
-        likes: 127,
-        comments: 2,
-        shares: 15,
+    return {
+      id: apiPost._id,
+      author: {
+        name: apiPost.author.fullName,
+        role: apiPost.author.professionalTitle || apiPost.author.role,
+        avatar: authorInitials,
+        verified: apiPost.author.verified || false,
       },
-      comments: [
-        {
-          id: "1",
-          author: "Sameer Khan",
-          timestamp: "18 hours ago",
-          content:
-            "Spot on! Point #3 is often overlooked. Vulnerability builds trust.",
-          likes: 12,
-        },
-        {
-          id: "2",
-          author: "Priya Sharma",
-          timestamp: "15 hours ago",
-          content:
-            "Great insights! The workshop sounds amazing. Would love to attend your next session.",
-          likes: 8,
-        },
-      ],
+      timestamp: apiPost.createdAt
+        ? formatRelativeTime(apiPost.createdAt)
+        : apiPost.formattedTimestamp || "recently",
+      createdAt: apiPost.createdAt || new Date().toISOString(),
+      badge: badgeInfo.badge,
+      badgeColor: badgeInfo.badgeColor,
+      content: apiPost.content,
+      hashtags: apiPost.hashtags,
+      metrics: apiPost.metrics,
+      likedBy: apiPost.likedBy || [],
+      comments: apiPost.comments.map((comment) => ({
+        id: comment._id,
+        author: comment.author.fullName,
+        timestamp: new Date(comment.createdAt).toLocaleString(),
+        content: comment.content,
+        likes: comment.likes,
+      })),
+    };
+  };
+
+  const stats = statsData?.data?.stats || {
+    totalPosts: 0,
+    totalLikes: 0,
+    totalViews: 0,
+    engagement: 0,
+  };
+
+  const posts = useMemo(
+    () => publishedPostsData?.data?.posts?.map(transformPost) || [],
+    [publishedPostsData]
+  );
+
+  const drafts = useMemo(
+    () => draftPostsData?.data?.posts?.map(transformPost) || [],
+    [draftPostsData]
+  );
+
+  const allPosts = useMemo(
+    () => allPostsData?.data?.posts?.map(transformPost) || [],
+    [allPostsData]
+  );
+
+  // Post type options matching CreatePostModal
+  const postTypeOptions = [
+    {
+      id: "article",
+      label: "Article",
+      icon: FileText,
+      color: "text-green-600",
+    },
+    { id: "image", label: "Image", icon: Image, color: "text-orange-600" },
+    { id: "video", label: "Video", icon: Video, color: "text-purple-600" },
+    {
+      id: "celebrate",
+      label: "Achievement",
+      icon: Trophy,
+      color: "text-teal-600",
     },
     {
-      id: "2",
-      author: {
-        ...authorInfo,
-      },
-      timestamp: "1 day ago",
-      badge: "Insight",
-      badgeColor: "blue",
-      content: `5 key learnings from my recent digital transformation consulting:
-
-1. It's not about technology - it's about people
-2. Change management is 80% communication
-3. Leaders need to model vulnerability
-4. Small wins create momentum
-5. Culture eats strategy for breakfast
-
-What's your take on digital transformation? Drop your thoughts below! 👋`,
-      hashtags: ["#DigitalTransformation", "#Leadership", "#ChangeManagement"],
-      metrics: {
-        views: 3456,
-        likes: 234,
-        comments: 1,
-        shares: 42,
-      },
-      comments: [
-        {
-          id: "1",
-          author: "Sameer Khan",
-          timestamp: "18 hours ago",
-          content:
-            "Spot on! Point #3 is often overlooked. Vulnerability builds trust.",
-          likes: 12,
-        },
-      ],
+      id: "insight",
+      label: "Insight",
+      icon: Lightbulb,
+      color: "text-orange-600",
     },
+    { id: "event", label: "Event", icon: Calendar, color: "text-purple-600" },
   ];
 
-  const drafts: any[] = [];
+  // Posts are already sorted by backend, just filter by search if needed
+  const filteredAllPosts = useMemo(() => {
+    let filtered = allPosts;
 
-  // All posts data (for "View All Posts" view)
-  const allPosts = [
-    ...posts,
-    {
-      id: "3",
-      author: {
-        ...authorInfo,
-      },
-      timestamp: "3 days ago",
-      badge: "Event",
-      badgeColor: "purple" as const,
-      content: `Excited to announce my upcoming workshop on "AI-Driven Leadership" next month! Limited seats available.`,
-      hashtags: ["#Event", "#Workshop", "#AI"],
-      metrics: {
-        views: 5678,
-        likes: 456,
-        comments: 32,
-        shares: 89,
-      },
-      comments: [],
-    },
-    {
-      id: "4",
-      author: {
-        ...authorInfo,
-      },
-      timestamp: "1 week ago",
-      badge: "Article",
-      badgeColor: "blue" as const,
-      content: `Just published a new article on "The Future of Remote Leadership". Check it out and share your thoughts!`,
-      hashtags: ["#Article", "#Leadership", "#RemoteWork"],
-      metrics: {
-        views: 8901,
-        likes: 678,
-        comments: 45,
-        shares: 123,
-      },
-      comments: [],
-    },
+    // Filter by search term (if not already filtered by API)
+    // Only do client-side filtering if search is not sent to API
+    if (searchTerm && !selectedPostType) {
+      filtered = filtered.filter(
+        (post) =>
+          post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          post.hashtags.some((tag) =>
+            tag.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+      );
+    }
+
+    return filtered;
+  }, [allPosts, searchTerm, selectedPostType]);
+
+  const selectedTypeLabel = selectedPostType
+    ? postTypeOptions.find((opt) => opt.id === selectedPostType)?.label ||
+      "All Types"
+    : "All Types";
+
+  const sortOptions = [
+    { id: "recent", label: "Most Recent" },
+    { id: "oldest", label: "Oldest First" },
+    { id: "mostLiked", label: "Most Liked" },
+    { id: "mostViewed", label: "Most Viewed" },
+    { id: "mostEngaged", label: "Most Engaged" },
   ];
+
+  const selectedSortLabel =
+    sortOptions.find((opt) => opt.id === sortOrder)?.label || "Most Recent";
+
+  const handleCreatePost = async (data: {
+    type: string;
+    content: string;
+    tags: string;
+  }) => {
+    try {
+      const hashtags = data.tags
+        ? data.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : [];
+
+      await createPost({
+        type: data.type as any,
+        content: data.content,
+        hashtags,
+        status: "published",
+      }).unwrap();
+
+      setIsCreateModalOpen(false);
+      refetchPosts();
+    } catch (error) {
+      console.error("Failed to create post:", error);
+    }
+  };
 
   const userInitials = getUserInitials(user?.fullName);
 
@@ -224,55 +303,61 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
             </div>
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-green-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900">
-                    Total Posts
-                  </span>
-                  <FileText className="w-5 h-5 text-gray-900" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.totalPosts}
-                </p>
+            {statsLoading ? (
+              <div className="text-center py-8 text-gray-500">
+                Loading stats...
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="bg-green-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      Total Posts
+                    </span>
+                    <FileText className="w-5 h-5 text-gray-900" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.totalPosts}
+                  </p>
+                </div>
 
-              <div className="bg-orange-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900">
-                    Total Likes
-                  </span>
-                  <Heart className="w-5 h-5 text-gray-900" />
+                <div className="bg-orange-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      Total Likes
+                    </span>
+                    <Heart className="w-5 h-5 text-gray-900" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.totalLikes.toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.totalLikes.toLocaleString()}
-                </p>
-              </div>
 
-              <div className="bg-purple-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900">
-                    Total Views
-                  </span>
-                  <Eye className="w-5 h-5 text-gray-900" />
+                <div className="bg-purple-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      Total Views
+                    </span>
+                    <Eye className="w-5 h-5 text-gray-900" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.totalViews.toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.totalViews.toLocaleString()}
-                </p>
-              </div>
 
-              <div className="bg-blue-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-900">
-                    Engagement
-                  </span>
-                  <TrendingUp className="w-5 h-5 text-gray-900" />
+                <div className="bg-blue-50 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      Engagement
+                    </span>
+                    <TrendingUp className="w-5 h-5 text-gray-900" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.engagement.toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.engagement.toLocaleString()}
-                </p>
               </div>
-            </div>
+            )}
 
             {/* Search and Filter Bar */}
             <div className="flex items-center gap-4">
@@ -286,41 +371,137 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
                   className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-medium text-gray-700">
-                  <Filter className="w-4 h-4" />
-                  All Types
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-medium text-gray-700">
-                  <ArrowUpDown className="w-4 h-4" />
-                  Most Recent
-                </button>
+              <div className="flex items-center gap-2 relative">
+                {/* All Types Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowTypeFilter(!showTypeFilter)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-medium text-gray-700"
+                  >
+                    <Filter className="w-4 h-4" />
+                    {selectedTypeLabel}
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showTypeFilter && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowTypeFilter(false)}
+                      />
+                      <div className="absolute top-full left-0 mt-2 w-56 bg-white border-2 border-gray-300 rounded-xl shadow-lg z-20 overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setSelectedPostType(null);
+                            setShowTypeFilter(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                            !selectedPostType
+                              ? "bg-teal-50 text-teal-700 font-medium"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          <Filter className="w-4 h-4" />
+                          <span>All Types</span>
+                        </button>
+                        {postTypeOptions.map((option) => {
+                          const Icon = option.icon;
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => {
+                                setSelectedPostType(option.id);
+                                setShowTypeFilter(false);
+                              }}
+                              className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 ${
+                                selectedPostType === option.id
+                                  ? "bg-teal-50 text-teal-700 font-medium"
+                                  : "text-gray-700"
+                              }`}
+                            >
+                              <Icon className={`w-4 h-4 ${option.color}`} />
+                              <span>{option.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Sort Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowSortFilter(!showSortFilter)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 transition-colors font-medium text-gray-700"
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                    {selectedSortLabel}
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+
+                  {/* Sort Dropdown Menu */}
+                  {showSortFilter && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowSortFilter(false)}
+                      />
+                      <div className="absolute top-full right-0 mt-2 w-48 bg-white border-2 border-gray-300 rounded-xl shadow-lg z-20 overflow-hidden">
+                        {sortOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            onClick={() => {
+                              setSortOrder(
+                                option.id as
+                                  | "recent"
+                                  | "oldest"
+                                  | "mostLiked"
+                                  | "mostViewed"
+                                  | "mostEngaged"
+                              );
+                              setShowSortFilter(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                              sortOrder === option.id
+                                ? "bg-teal-50 text-teal-700 font-medium"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Posts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mx-6 mb-8">
-            {allPosts
-              .filter((post) =>
-                searchTerm
-                  ? post.content
-                      .toLowerCase()
-                      .includes(searchTerm.toLowerCase()) ||
-                    post.hashtags.some((tag) =>
-                      tag.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                  : true
-              )
-              .map((post) => (
+          {allPostsLoading ? (
+            <div className="text-center py-12 text-gray-500 mx-6">
+              Loading posts...
+            </div>
+          ) : filteredAllPosts.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mx-6 mb-8">
+              {filteredAllPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
                   currentUserAvatar={userInitials}
                   currentUserName={authorInfo.name}
+                  onLikeToggle={refetchStats}
                 />
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500 mx-6">
+              No posts found
+            </div>
+          )}
         </div>
       </div>
     );
@@ -331,49 +512,61 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
       {/* Main Content - Full width after sidebar, no max-width constraint */}
       <div className="w-full">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 mx-6">
-          <div className="bg-teal-600 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-white">
-                Total Posts
-              </span>
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.totalPosts}</p>
+        {statsLoading ? (
+          <div className="text-center py-8 text-gray-500 mx-6">
+            Loading stats...
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 mx-6">
+            <div className="bg-teal-600 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-white">
+                  Total Posts
+                </span>
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-2xl font-bold text-white">
+                {stats.totalPosts}
+              </p>
+            </div>
 
-          <div className="bg-orange-600 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-white">
-                Total Likes
-              </span>
-              <Heart className="w-5 h-5 text-white" />
+            <div className="bg-orange-600 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-white">
+                  Total Likes
+                </span>
+                <Heart className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-2xl font-bold text-white">
+                {stats.totalLikes.toLocaleString()}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-white">
-              {stats.totalLikes.toLocaleString()}
-            </p>
-          </div>
 
-          <div className="bg-purple-500 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-white">
-                Total Views
-              </span>
-              <Eye className="w-5 h-5 text-white" />
+            <div className="bg-purple-500 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-white">
+                  Total Views
+                </span>
+                <Eye className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-2xl font-bold text-white">
+                {stats.totalViews.toLocaleString()}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-white">
-              {stats.totalViews.toLocaleString()}
-            </p>
-          </div>
 
-          <div className="bg-teal-600 rounded-xl p-4 shadow-sm border-2 border-gray-300">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-white">Engagement</span>
-              <TrendingUp className="w-5 h-5 text-white" />
+            <div className="bg-teal-600 rounded-xl p-4 shadow-sm border-2 border-gray-300">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-white">
+                  Engagement
+                </span>
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-2xl font-bold text-white">
+                {stats.engagement}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-white">{stats.engagement}</p>
           </div>
-        </div>
+        )}
 
         {/* Post Container with very light yellow background */}
         <div className="bg-[#fffef9] rounded-xl p-6 mx-6">
@@ -387,11 +580,7 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
           <CreatePostModal
             isOpen={isCreateModalOpen}
             onClose={() => setIsCreateModalOpen(false)}
-            onPublish={(data) => {
-              console.log("Publishing post:", data);
-              // TODO: Implement actual post creation API call
-              setIsCreateModalOpen(false);
-            }}
+            onPublish={handleCreatePost}
           />
 
           {/* Tabs and View All Button */}
@@ -433,13 +622,18 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
           {/* Posts List */}
           <div className="space-y-6">
             {activeTab === "posts" ? (
-              posts.length > 0 ? (
+              postsLoading ? (
+                <div className="text-center py-12 text-gray-500">
+                  Loading posts...
+                </div>
+              ) : posts.length > 0 ? (
                 posts.map((post) => (
                   <PostCard
                     key={post.id}
                     post={post}
                     currentUserAvatar={userInitials}
                     currentUserName={authorInfo.name}
+                    onLikeToggle={refetchStats}
                   />
                 ))
               ) : (
@@ -447,6 +641,10 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
                   No posts yet. Create your first post!
                 </div>
               )
+            ) : draftsLoading ? (
+              <div className="text-center py-12 text-gray-500">
+                Loading drafts...
+              </div>
             ) : drafts.length > 0 ? (
               drafts.map((draft) => (
                 <PostCard
@@ -454,6 +652,7 @@ What's your take on digital transformation? Drop your thoughts below! 👋`,
                   post={draft}
                   currentUserAvatar={userInitials}
                   currentUserName={authorInfo.name}
+                  onLikeToggle={refetchStats}
                 />
               ))
             ) : (

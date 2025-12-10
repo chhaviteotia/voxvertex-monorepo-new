@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   CheckCircle2,
   Heart,
@@ -10,6 +10,14 @@ import {
   Eye,
   Send,
 } from "lucide-react";
+import {
+  useToggleLikePostMutation,
+  useAddCommentMutation,
+  useSharePostMutation,
+  useGetPostByIdQuery,
+} from "@/store/api/postsApi";
+import { useExpertAuth } from "@/store/hooks/expertAuth";
+import { formatRelativeTime } from "@/utils/timeUtils";
 
 interface PostComment {
   id: string;
@@ -28,6 +36,7 @@ interface Post {
     verified: boolean;
   };
   timestamp: string;
+  createdAt?: string; // ISO date string for calculating relative time
   badge: string;
   badgeColor: "green" | "blue" | "orange" | "purple";
   content: string;
@@ -39,24 +48,357 @@ interface Post {
     shares: number;
   };
   comments: PostComment[];
+  likedBy?: string[]; // Add likedBy array for checking if user liked
 }
 
 interface PostCardProps {
   post: Post;
   currentUserAvatar?: string;
   currentUserName?: string;
+  onLikeToggle?: () => void; // Callback to notify parent of like/unlike
 }
 
 export default function PostCard({
   post,
   currentUserAvatar = "PS",
   currentUserName = "User",
+  onLikeToggle,
 }: PostCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const { user } = useExpertAuth();
   const [showComments, setShowComments] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<PostComment[]>(post.comments || []);
+  const [localLikedBy, setLocalLikedBy] = useState<string[]>(() => {
+    // Normalize likedBy array to strings
+    if (!post.likedBy || post.likedBy.length === 0) return [];
+    return post.likedBy.map((id: any) =>
+      typeof id === "string" ? id : id?.toString ? id.toString() : String(id)
+    );
+  });
+  const [localMetrics, setLocalMetrics] = useState(post.metrics);
+
+  // API mutations
+  const [toggleLike, { isLoading: isTogglingLike }] =
+    useToggleLikePostMutation();
+  const [addComment, { isLoading: isAddingComment }] = useAddCommentMutation();
+  const [sharePost, { isLoading: isSharing }] = useSharePostMutation();
+
+  // Track if we're in the middle of a like operation to prevent reset
+  const [isLikeOperationInProgress, setIsLikeOperationInProgress] =
+    useState(false);
+
+  // Track the last known post ID to detect when we get a new post
+  const [lastPostId, setLastPostId] = useState(post.id);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Format timestamp for display
+  const formattedTimestamp = useMemo(() => {
+    if (post.createdAt) {
+      return formatRelativeTime(post.createdAt);
+    }
+    return post.timestamp || "recently";
+  }, [post.createdAt, post.timestamp]);
+
+  // Initialize local state only once when post changes or on mount
+  useEffect(() => {
+    // Only initialize when post ID changes (new post) or on first mount
+    if (post.id !== lastPostId || !isInitialized) {
+      setLastPostId(post.id);
+      setIsInitialized(true);
+
+      // Initialize state for new post
+      if (post.likedBy) {
+        const normalizedLikedBy = post.likedBy.map((id: any) =>
+          typeof id === "string"
+            ? id
+            : id?.toString
+            ? id.toString()
+            : String(id)
+        );
+        setLocalLikedBy(normalizedLikedBy);
+      } else {
+        setLocalLikedBy([]);
+      }
+      if (post.metrics) {
+        setLocalMetrics(post.metrics);
+      }
+      if (post.comments) {
+        setComments(post.comments);
+      }
+    } else {
+      // For the same post, update from props if not in the middle of a like operation
+      // This ensures that when navigating between views, the state syncs with the cache
+      if (!isLikeOperationInProgress) {
+        // Update likedBy and metrics from props to sync with cache
+        if (post.likedBy) {
+          const normalizedLikedBy = post.likedBy.map((id: any) =>
+            typeof id === "string"
+              ? id
+              : id?.toString
+              ? id.toString()
+              : String(id)
+          );
+          setLocalLikedBy(normalizedLikedBy);
+        }
+        if (post.metrics) {
+          setLocalMetrics(post.metrics);
+        }
+        if (post.comments) {
+          setComments(post.comments);
+        }
+      } else {
+        // During like operation, only update comments
+        if (post.comments) {
+          setComments(post.comments);
+        }
+      }
+    }
+  }, [
+    post.id,
+    post.likedBy,
+    post.metrics,
+    post.comments,
+    lastPostId,
+    isInitialized,
+    isLikeOperationInProgress,
+  ]);
+
+  // Get user ID in consistent format once
+  const userId = useMemo(() => {
+    if (!user?._id) return null;
+    const id = user._id;
+    return typeof id === "string"
+      ? id
+      : (id as any)?.toString
+      ? (id as any).toString()
+      : String(id);
+  }, [user?._id]);
+
+  // Check if current user has liked the post
+  const isLiked = useMemo(() => {
+    if (!userId || !localLikedBy || localLikedBy.length === 0) {
+      return false;
+    }
+
+    // userId is already normalized from useMemo above
+    const found = localLikedBy.some((id) => {
+      const idStr =
+        typeof id === "string"
+          ? id
+          : (id as any)?.toString
+          ? (id as any).toString()
+          : String(id);
+      // Use strict equality for comparison
+      return idStr === userId;
+    });
+
+    return found;
+  }, [userId, localLikedBy]);
+
+  const handleLike = async () => {
+    if (!userId) {
+      console.warn("User ID not available");
+      return;
+    }
+
+    const wasLiked = isLiked;
+
+    // Mark that we're starting a like operation
+    setIsLikeOperationInProgress(true);
+
+    // userId is already normalized from useMemo, use it directly
+    // Optimistic update
+    if (wasLiked) {
+      // Unlike - remove user ID
+      setLocalLikedBy((prev) => {
+        return prev.filter((id) => {
+          const idStr =
+            typeof id === "string"
+              ? id
+              : id?.toString
+              ? id.toString()
+              : String(id);
+          return idStr !== userId;
+        });
+      });
+      setLocalMetrics((prev) => ({
+        ...prev,
+        likes: Math.max(0, prev.likes - 1),
+      }));
+    } else {
+      // Like - add user ID (only if not already present)
+      setLocalLikedBy((prev) => {
+        // Check if already in array to avoid duplicates
+        const alreadyLiked = prev.some((id) => {
+          const idStr =
+            typeof id === "string"
+              ? id
+              : (id as any)?.toString
+              ? (id as any).toString()
+              : String(id);
+          return idStr === userId;
+        });
+        if (alreadyLiked) return prev;
+        // Add the userId (already normalized)
+        return [...prev, userId];
+      });
+      setLocalMetrics((prev) => ({
+        ...prev,
+        likes: prev.likes + 1,
+      }));
+    }
+
+    try {
+      const result = await toggleLike(post.id).unwrap();
+
+      // Update with server response if available
+      if (result?.data?.post) {
+        const updatedPost = result.data.post;
+        // Ensure likedBy is an array of strings
+        const likedByArray = updatedPost.likedBy || [];
+        const likedByStrings = likedByArray.map((id: any) => {
+          if (typeof id === "string") return id;
+          if (id?._id) return String(id._id);
+          if (id?.toString) return String(id.toString());
+          return String(id);
+        });
+        // Update state while flag is still true to prevent useEffect from resetting
+        setLocalLikedBy(likedByStrings);
+        setLocalMetrics(updatedPost.metrics || post.metrics);
+
+        // Notify parent to update stats
+        if (onLikeToggle) {
+          onLikeToggle();
+        }
+      } else {
+        // If response doesn't have expected structure, refetch might be needed
+        console.warn("Unexpected response structure from toggleLike:", result);
+      }
+    } catch (error: any) {
+      console.error("Failed to toggle like:", error);
+      console.error("Error details:", error?.data || error?.message || error);
+      // Revert optimistic update on error
+      if (wasLiked) {
+        setLocalLikedBy((prev) => {
+          // Check if already present to avoid duplicates
+          const alreadyPresent = prev.some((id) => {
+            const idStr =
+              typeof id === "string"
+                ? id
+                : (id as any)?.toString
+                ? (id as any).toString()
+                : String(id);
+            return idStr === userId;
+          });
+          if (alreadyPresent) return prev;
+          return [...prev, userId];
+        });
+        setLocalMetrics((prev) => ({
+          ...prev,
+          likes: prev.likes + 1,
+        }));
+      } else {
+        setLocalLikedBy((prev) =>
+          prev.filter((id) => {
+            const idStr =
+              typeof id === "string"
+                ? id
+                : (id as any)?.toString
+                ? (id as any).toString()
+                : String(id);
+            return idStr !== userId;
+          })
+        );
+        setLocalMetrics((prev) => ({
+          ...prev,
+          likes: Math.max(0, prev.likes - 1),
+        }));
+      }
+    } finally {
+      // Reset the flag after operation completes (with a delay to ensure state updates settle)
+      // This prevents the useEffect from resetting the state immediately after the API response
+      // Use a shorter delay since we're now syncing with cache
+      setTimeout(() => {
+        setIsLikeOperationInProgress(false);
+      }, 200);
+    }
+  };
+
+  const handleShare = async () => {
+    // Optimistic update
+    setLocalMetrics((prev) => ({
+      ...prev,
+      shares: prev.shares + 1,
+    }));
+
+    try {
+      const result = await sharePost(post.id).unwrap();
+      // Update with server response if available
+      if (result.data?.post) {
+        setLocalMetrics(result.data.post.metrics);
+      }
+    } catch (error) {
+      console.error("Failed to share post:", error);
+      // Revert optimistic update on error
+      setLocalMetrics((prev) => ({
+        ...prev,
+        shares: Math.max(0, prev.shares - 1),
+      }));
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) return;
+
+    // Optimistic update
+    const tempComment: PostComment = {
+      id: `temp-${Date.now()}`,
+      author: currentUserName,
+      timestamp: "just now",
+      content: commentText.trim(),
+      likes: 0,
+    };
+    setComments((prev) => [...prev, tempComment]);
+    setLocalMetrics((prev) => ({
+      ...prev,
+      comments: prev.comments + 1,
+    }));
+    const commentTextToSubmit = commentText.trim();
+    setCommentText("");
+
+    try {
+      const result = await addComment({
+        postId: post.id,
+        content: commentTextToSubmit,
+      }).unwrap();
+
+      if (result.data?.post) {
+        const transformedComments = result.data.post.comments.map(
+          (comment: any) => ({
+            id: comment._id,
+            author: comment.author?.fullName || comment.author?.name || "User",
+            timestamp: comment.createdAt
+              ? new Date(comment.createdAt).toLocaleString()
+              : "just now",
+            content: comment.content,
+            likes: comment.likes || 0,
+          })
+        );
+        setComments(transformedComments);
+        setLocalMetrics(result.data.post.metrics);
+      }
+    } catch (error) {
+      console.error("Failed to add comment:", error);
+      // Revert optimistic update on error
+      setComments((prev) => prev.filter((c) => c.id !== tempComment.id));
+      setLocalMetrics((prev) => ({
+        ...prev,
+        comments: Math.max(0, prev.comments - 1),
+      }));
+      setCommentText(commentTextToSubmit);
+    }
+  };
 
   const badgeColors = {
     green: "bg-green-100 text-green-700 border-green-200",
@@ -86,7 +428,7 @@ export default function PostCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">{post.timestamp}</span>
+          <span className="text-sm text-gray-500">{formattedTimestamp}</span>
           <span
             className={`px-2 py-1 text-xs font-medium rounded border ${
               badgeColors[post.badgeColor]
@@ -122,19 +464,19 @@ export default function PostCard({
       <div className="flex items-center gap-6 mb-4 pb-4 border-b border-gray-200">
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <Eye className="w-4 h-4" />
-          <span>{post.metrics.views.toLocaleString()} views</span>
+          <span>{localMetrics.views.toLocaleString()} views</span>
         </div>
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <Heart className="w-4 h-4" />
-          <span>{post.metrics.likes} likes</span>
+          <span>{localMetrics.likes} likes</span>
         </div>
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <MessageCircle className="w-4 h-4" />
-          <span>{post.metrics.comments} comments</span>
+          <span>{localMetrics.comments} comments</span>
         </div>
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <Share2 className="w-4 h-4" />
-          <span>{post.metrics.shares} shares</span>
+          <span>{localMetrics.shares} shares</span>
         </div>
       </div>
 
@@ -142,12 +484,13 @@ export default function PostCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setIsLiked(!isLiked)}
+            onClick={handleLike}
+            disabled={isTogglingLike}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
               isLiked
                 ? "bg-red-50 text-red-600"
                 : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Heart className={`w-5 h-5 ${isLiked ? "fill-red-600" : ""}`} />
             <span className="font-medium">Like</span>
@@ -159,7 +502,11 @@ export default function PostCard({
             <MessageCircle className="w-5 h-5" />
             <span className="font-medium">Comment</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+          <button
+            onClick={handleShare}
+            disabled={isSharing}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Share2 className="w-5 h-5" />
             <span className="font-medium">Share</span>
           </button>
@@ -244,40 +591,24 @@ export default function PostCard({
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               onKeyPress={(e) => {
-                if (e.key === "Enter" && commentText.trim()) {
-                  const newComment: PostComment = {
-                    id: Date.now().toString(),
-                    author: currentUserName,
-                    timestamp: "just now",
-                    content: commentText.trim(),
-                    likes: 0,
-                  };
-                  setComments([...comments, newComment]);
-                  setCommentText("");
+                if (
+                  e.key === "Enter" &&
+                  commentText.trim() &&
+                  !isAddingComment
+                ) {
+                  handleAddComment();
                 }
               }}
               placeholder="Write a comment..."
               className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
             />
             <button
-              onClick={() => {
-                if (commentText.trim()) {
-                  const newComment: PostComment = {
-                    id: Date.now().toString(),
-                    author: currentUserName,
-                    timestamp: "just now",
-                    content: commentText.trim(),
-                    likes: 0,
-                  };
-                  setComments([...comments, newComment]);
-                  setCommentText("");
-                }
-              }}
-              disabled={!commentText.trim()}
+              onClick={handleAddComment}
+              disabled={!commentText.trim() || isAddingComment}
               className="px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4" />
-              Post Comment
+              {isAddingComment ? "Posting..." : "Post Comment"}
             </button>
           </div>
         </div>
