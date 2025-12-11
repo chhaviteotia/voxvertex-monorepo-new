@@ -16,9 +16,12 @@ import {
   Building2,
   Award,
   Star,
+  Briefcase,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import SendMessageModal from "./components/SendMessageModal";
+import { useGetExpertByIdQuery } from "@/store/api/marketplaceApi";
 
 interface Expert {
   id: string;
@@ -62,121 +65,6 @@ interface Expert {
   }>;
 }
 
-// Mock data - in real app, this would come from API based on ID
-const getExpertById = (id: string): Expert | null => {
-  const experts: Expert[] = [
-    {
-      id: "1",
-      name: "Dr. Priya Sharma",
-      initials: "PS",
-      title: "Mindfulness Trainer & Wellness Expert",
-      rating: 5,
-      reviews: 215,
-      sessions: 680,
-      description:
-        "Clinical psychologist and certified mindfulness instructor. Pioneering corporate wellness programs for global organizations.",
-      tags: ["Mindfulness", "Stress Management", "Corporate Wellness"],
-      rate: "$200/hr",
-      location: "London, UK",
-      responseTime: "Responds within 1 hour",
-      languages: ["English", "Hindi"],
-      experience: "15+ years experience",
-      availability: "Available",
-      isConnected: true,
-      certifications: [
-        {
-          name: "Certified Mindfulness Instructor",
-          issuer: "Mindfulness Institute",
-          year: "2010",
-        },
-      ],
-    },
-    {
-      id: "2",
-      name: "Sarah Johnson",
-      initials: "SJ",
-      title: "Leadership Coach & Mentor",
-      rating: 4.9,
-      reviews: 127,
-      sessions: 450,
-      description:
-        "15+ years of experience coaching Fortune 500 executives and high-growth startups. Specializing in transformational leadership and organizational culture.",
-      tags: ["Leadership", "Team Building", "Executive Coaching"],
-      rate: "$250/hr",
-      location: "New York, USA",
-      responseTime: "Responds within 1 hour",
-      languages: ["English", "Spanish"],
-      experience: "15+ years experience",
-      availability: "Available",
-      isConnected: true,
-    },
-    {
-      id: "3",
-      name: "Elena Volkov",
-      initials: "EV",
-      title: "Product Management Expert",
-      rating: 4.9,
-      reviews: 156,
-      sessions: 420,
-      description:
-        "Led product teams at Google and startups. Passionate about building products that users love and businesses need.",
-      tags: ["Product Strategy", "Agile", "User Experience"],
-      rate: "$280/hr",
-      location: "Berlin, Germany",
-      responseTime: "Responds within 3 hours",
-      languages: ["English", "German", "Russian"],
-      experience: "15+ years experience",
-      availability: "Limited",
-      isConnected: true,
-      experienceList: [
-        {
-          role: "Product Manager",
-          company: "Google",
-          duration: "2005-2015",
-          description: "Led product teams in developing innovative solutions.",
-        },
-        {
-          role: "Product Strategist",
-          company: "Startups",
-          duration: "2015-2020",
-          description: "Developed product strategies for startups.",
-        },
-      ],
-      educationList: [
-        {
-          degree: "MBA",
-          institution: "Stanford University",
-          year: "2005",
-        },
-        {
-          degree: "BSc",
-          institution: "Technical University of Munich",
-          year: "2001",
-        },
-      ],
-      certifications: [
-        {
-          name: "Certified Product Manager",
-          issuer: "Product Institute",
-          year: "2010",
-        },
-      ],
-      reviewsList: [
-        {
-          reviewerName: "Charlie White",
-          reviewerInitials: "CW",
-          reviewerTitle: "Product Manager at Product Inc",
-          rating: 5,
-          review:
-            "Elena is a great strategist who helped improve our product management.",
-        },
-      ],
-    },
-  ];
-
-  return experts.find((e) => e.id === id) || null;
-};
-
 type TabType = "Overview" | "Experience" | "Education" | "Reviews";
 
 export default function ExpertProfilePage({
@@ -187,17 +75,25 @@ export default function ExpertProfilePage({
   const [activeTab, setActiveTab] = useState<TabType>("Overview");
   const [isFavorite, setIsFavorite] = useState(false);
   const [expertId, setExpertId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
 
   useEffect(() => {
     params.then((resolvedParams) => {
       setExpertId(resolvedParams.id);
-      setIsLoading(false);
     });
   }, [params]);
 
-  const expert = expertId ? getExpertById(expertId) : null;
+  // Fetch expert from API
+  const {
+    data: expertData,
+    isLoading,
+    isError,
+    error,
+  } = useGetExpertByIdQuery(expertId || "", {
+    skip: !expertId,
+  });
+
+  const expert = expertData?.data?.expert || null;
 
   if (isLoading) {
     return (
@@ -210,9 +106,9 @@ export default function ExpertProfilePage({
     );
   }
 
-  if (!expert) {
+  if (isError || (!isLoading && !expert)) {
     return (
-      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">
             Expert not found
@@ -244,7 +140,7 @@ export default function ExpertProfilePage({
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f0]">
+    <div className="min-h-screen bg-[#fffbf5]">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -308,27 +204,22 @@ export default function ExpertProfilePage({
               </div>
 
               {/* Statistics */}
-              <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b border-gray-200">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Star className="w-4 h-4 text-red-500 fill-red-500" />
-                    <span className="text-sm font-semibold text-gray-900">
-                      {expert.rating}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-600">Rating</p>
+              <div className="flex items-center justify-center gap-6 mb-6 pb-6 border-b border-gray-200">
+                <div className="flex items-center gap-1">
+                  <Star className="w-4 h-4 text-red-500 fill-red-500" />
+                  <span className="text-sm font-medium text-gray-900">
+                    {expert.rating} Rating
+                  </span>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">
-                    {expert.reviews}
-                  </p>
-                  <p className="text-xs text-gray-600">Reviews</p>
+                <div>
+                  <span className="text-sm font-medium text-gray-900">
+                    {expert.reviews} Reviews
+                  </span>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-900 mb-1">
-                    {expert.sessions}
-                  </p>
-                  <p className="text-xs text-gray-600">Sessions</p>
+                <div>
+                  <span className="text-sm font-medium text-gray-900">
+                    {expert.sessions} Sessions
+                  </span>
                 </div>
               </div>
 
@@ -359,11 +250,15 @@ export default function ExpertProfilePage({
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <Clock className="w-4 h-4 text-gray-500" />
-                  <span>{expert.responseTime}</span>
+                  <span>Responds within 2 hours</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <Languages className="w-4 h-4 text-gray-500" />
-                  <span>{expert.languages.join(", ")}</span>
+                  <span>
+                    {expert.languages && expert.languages.length > 0
+                      ? expert.languages.join(", ")
+                      : "Not specified"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-700">
                   <TrendingUp className="w-4 h-4 text-gray-500" />
@@ -386,18 +281,21 @@ export default function ExpertProfilePage({
 
           {/* Right Content - Profile Details */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md border border-gray-200">
+            <div>
               {/* Tabs */}
-              <div className="border-b border-gray-200 px-6 pt-4 bg-gray-50">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <div className="px-6 pt-4">
+                <nav
+                  className="flex bg-gray-200 rounded-full p-1"
+                  aria-label="Tabs"
+                >
                   {tabs.map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      className={`flex-1 whitespace-nowrap py-2 px-4 font-medium text-sm transition-colors text-center ${
                         activeTab === tab
-                          ? "border-teal-600 text-teal-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                          ? "bg-white text-gray-900 rounded-full shadow-sm"
+                          : "text-gray-700 hover:text-gray-900"
                       }`}
                     >
                       {tab}
@@ -413,7 +311,7 @@ export default function ExpertProfilePage({
                     {/* About */}
                     <div className="bg-white rounded-lg p-4 border border-gray-200">
                       <div className="flex items-center gap-2 mb-3">
-                        <User className="w-5 h-5 text-gray-600" />
+                        <MessageCircle className="w-5 h-5 text-gray-600" />
                         <h3 className="font-semibold text-gray-900">About</h3>
                       </div>
                       <p className="text-sm text-gray-700 leading-relaxed">
@@ -444,7 +342,7 @@ export default function ExpertProfilePage({
                     {/* Skills & Competencies */}
                     <div className="bg-white rounded-lg p-4 border border-gray-200">
                       <div className="flex items-center gap-2 mb-3">
-                        <User className="w-5 h-5 text-gray-600" />
+                        <Building2 className="w-5 h-5 text-gray-600" />
                         <h3 className="font-semibold text-gray-900">
                           Skills & Competencies
                         </h3>
@@ -453,7 +351,7 @@ export default function ExpertProfilePage({
                         {expert.tags.map((tag, index) => (
                           <span
                             key={index}
-                            className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full"
+                            className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full"
                           >
                             {tag}
                           </span>
@@ -466,7 +364,7 @@ export default function ExpertProfilePage({
                       expert.certifications.length > 0 && (
                         <div className="bg-white rounded-lg p-4 border border-gray-200">
                           <div className="flex items-center gap-2 mb-3">
-                            <User className="w-5 h-5 text-gray-600" />
+                            <Award className="w-5 h-5 text-gray-600" />
                             <h3 className="font-semibold text-gray-900">
                               Certifications
                             </h3>
@@ -475,10 +373,10 @@ export default function ExpertProfilePage({
                             {expert.certifications.map((cert, index) => (
                               <div
                                 key={index}
-                                className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                                className="bg-yellow-50 rounded-lg p-4 border border-gray-200"
                               >
                                 <div className="flex items-start gap-3">
-                                  <User className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
+                                  <Award className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
                                   <div>
                                     <p className="font-medium text-gray-900">
                                       {cert.name}
@@ -500,28 +398,31 @@ export default function ExpertProfilePage({
                 )}
 
                 {activeTab === "Experience" && (
-                  <div>
+                  <div className="bg-white rounded-lg p-6 border border-gray-200">
                     <div className="flex items-center gap-2 mb-6">
-                      <Building2 className="w-5 h-5 text-gray-600" />
+                      <Briefcase className="w-5 h-5 text-gray-600" />
                       <h3 className="font-semibold text-gray-900">
                         Professional Experience
                       </h3>
                     </div>
                     {expert.experienceList &&
                     expert.experienceList.length > 0 ? (
-                      <div className="space-y-4">
-                        {expert.experienceList.map((exp, index) => (
-                          <div
-                            key={index}
-                            className="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                          >
-                            <div className="flex items-start gap-3">
-                              <Building2 className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
-                              <div className="flex-1">
+                      <div className="relative">
+                        {/* Timeline line */}
+                        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-300"></div>
+                        <div className="space-y-6">
+                          {expert.experienceList.map((exp, index) => (
+                            <div
+                              key={index}
+                              className="relative flex items-start"
+                            >
+                              {/* Timeline marker */}
+                              <div className="absolute left-3 w-3 h-3 rounded-full bg-teal-500 border-2 border-white z-10"></div>
+                              <div className="ml-8 flex-1 bg-gray-100 rounded-lg p-4">
                                 <p className="font-medium text-gray-900">
                                   {exp.role}
                                 </p>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 mt-1">
                                   {exp.company}
                                 </p>
                                 <div className="flex items-center gap-2 mt-2">
@@ -535,8 +436,8 @@ export default function ExpertProfilePage({
                                 </p>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500">
@@ -547,9 +448,9 @@ export default function ExpertProfilePage({
                 )}
 
                 {activeTab === "Education" && (
-                  <div>
+                  <div className="bg-white rounded-lg p-6 border border-gray-200">
                     <div className="flex items-center gap-2 mb-6">
-                      <Award className="w-5 h-5 text-gray-600" />
+                      <BookOpen className="w-5 h-5 text-teal-600" />
                       <h3 className="font-semibold text-gray-900">
                         Educational Background
                       </h3>
@@ -559,10 +460,10 @@ export default function ExpertProfilePage({
                         {expert.educationList.map((edu, index) => (
                           <div
                             key={index}
-                            className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                            className="bg-gray-100 rounded-lg p-4"
                           >
                             <div className="flex items-start gap-3">
-                              <Award className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
+                              <BookOpen className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                               <div>
                                 <p className="font-medium text-gray-900">
                                   {edu.degree}
@@ -618,7 +519,7 @@ export default function ExpertProfilePage({
                         {expert.reviewsList.map((review, index) => (
                           <div
                             key={index}
-                            className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                            className="bg-gray-50 rounded-lg p-4"
                           >
                             <div className="flex items-start gap-3 mb-3">
                               <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-semibold text-sm">

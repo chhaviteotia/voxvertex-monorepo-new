@@ -2,10 +2,10 @@
 
 import { useEffect } from "react";
 import { BarChart3 } from "lucide-react";
-import SectionHeader from "../common/SectionHeader";
+import SectionHeader from "../../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchProfile, selectProfile } from "@/store/slices/profileSlice";
-import InfoCard from "../common/InfoCard";
+import InfoCard from "../../../components/common/InfoCard";
 
 /**
  * ProfileStats Component - Using Redux

@@ -101,6 +101,13 @@ router.get("/:userType/check-phone/:phoneNumber", checkPhoneController);
 router.post("/login", validateRequiredFields(['email', 'password']), unifiedLoginController);
 
 /**
+ * @route   GET /api/auth/me
+ * @desc    Get current user (direct route without userType)
+ * @access  Private
+ */
+router.get("/me", authenticateUser, getCurrentUserController);
+
+/**
  * @route   GET /api/user/:userType/me
  * @desc    Get current user
  * @access  Private

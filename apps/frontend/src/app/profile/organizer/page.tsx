@@ -1,11 +1,19 @@
 "use client";
 
-import ProfilePageContent from "../components/ProfilePageContent";
-
 /**
- * Organizer Profile Page - Optimized with shared component
- * Displays all profile sections for organizers including Posts
+ * Organizer Profile Page
+ * TODO: Implement organizer profile UI
+ * Components will be added in profile/organizer/components/ folder
  */
 export default function OrganizerProfilePage() {
-  return <ProfilePageContent role="organizer" />;
+  return (
+    <div className="min-h-screen bg-[#fffbf5] flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+          Organizer Profile
+        </h1>
+        <p className="text-gray-600">Coming soon...</p>
+      </div>
+    </div>
+  );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   FileText,
@@ -16,6 +16,8 @@ interface CreatePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPublish: (data: { type: string; content: string; tags: string }) => void;
+  onSaveDraft: (data: { type: string; content: string; tags: string }) => void;
+  editingDraft?: any;
 }
 
 const POST_TYPES = [
@@ -61,16 +63,46 @@ export default function CreatePostModal({
   isOpen,
   onClose,
   onPublish,
+  onSaveDraft,
+  editingDraft,
 }: CreatePostModalProps) {
   const [selectedType, setSelectedType] = useState("article");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
+
+  // Pre-fill form when editing draft
+  useEffect(() => {
+    if (editingDraft && isOpen) {
+      setSelectedType(editingDraft.type || "article");
+      setContent(editingDraft.content || "");
+      setTags(editingDraft.hashtags?.join(", ") || "");
+    } else if (!editingDraft && isOpen) {
+      // Reset form when creating new
+      setSelectedType("article");
+      setContent("");
+      setTags("");
+    }
+  }, [editingDraft, isOpen]);
 
   if (!isOpen) return null;
 
   const handlePublish = () => {
     if (!content.trim()) return;
     onPublish({
+      type: selectedType,
+      content,
+      tags,
+    });
+    // Reset form
+    setContent("");
+    setTags("");
+    setSelectedType("article");
+    onClose();
+  };
+
+  const handleSaveDraft = () => {
+    // Allow saving draft even with empty content
+    onSaveDraft({
       type: selectedType,
       content,
       tags,
@@ -180,6 +212,12 @@ export default function CreatePostModal({
             className="flex-1 px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium text-sm"
           >
             Cancel
+          </button>
+          <button
+            onClick={handleSaveDraft}
+            className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors font-medium text-sm"
+          >
+            Save as Draft
           </button>
           <button
             onClick={handlePublish}

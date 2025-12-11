@@ -53,16 +53,23 @@ export const sendEmailOtpController = asyncHandler(async (req, res) => {
         return sendError(res, "Email already registered. Please use a different email or login.", 400);
       }
       // If user exists but registration not completed, check if they're trying to register with a different role
-      // For expert userType, role can be speaker or trainer (both are valid)
+      // For expert userType, role can be speaker or trainer (both are valid and interchangeable)
       // For organiser/participant, role must match exactly
       if (existingUser.role) {
-        if (userType === 'expert' && !["speaker", "trainer"].includes(existingUser.role)) {
+        const existingRole = String(existingUser.role).toLowerCase().trim();
+        console.log(`🔍 Checking role compatibility: userType=${userType}, existingRole=${existingRole}, registrationCompleted=${existingUser.registrationCompleted}`);
+        
+        if (userType === 'expert') {
+          // For experts, both speaker and trainer are valid - allow switching between them
+          const validExpertRoles = ["speaker", "trainer"];
+          if (!validExpertRoles.includes(existingRole)) {
+            return sendError(res, `This email is already associated with a ${existingUser.role} account. Please use a different email.`, 400);
+          }
+          // If existing role is speaker or trainer, allow OTP resend (user can switch roles during registration)
+          console.log(`✅ Allowing OTP for expert userType with existing role: ${existingRole}`);
+        } else if (userType === 'organiser' && existingRole !== 'organiser') {
           return sendError(res, `This email is already associated with a ${existingUser.role} account. Please use a different email.`, 400);
-        }
-        if (userType === 'organiser' && existingUser.role !== 'organiser') {
-          return sendError(res, `This email is already associated with a ${existingUser.role} account. Please use a different email.`, 400);
-        }
-        if (userType === 'participant' && existingUser.role !== 'participant') {
+        } else if (userType === 'participant' && existingRole !== 'participant') {
           return sendError(res, `This email is already associated with a ${existingUser.role} account. Please use a different email.`, 400);
         }
       }
@@ -149,9 +156,14 @@ export const verifyPhoneOtpController = asyncHandler(async (req, res) => {
   await verifyOtp(normalizedPhone, "phone", otpString, userType);
 
   // Update verification status
-  // Email is optional - if provided, we'll use it to find user
-  // If not provided, we'll try to find user by other means
-  await updateVerificationStatus(normalizedPhone, "phone", true, email || null, userType);
+  // Email is optional but highly recommended - if provided, we'll use it to find user
+  // If not provided, we'll try to find user by other means (phone number or emailVerified user)
+  const normalizedEmail = email ? email.toLowerCase().trim() : null;
+  const updatedUser = await updateVerificationStatus(normalizedPhone, "phone", true, normalizedEmail, userType);
+  
+  console.log(`✅ Phone verified successfully for user: ${updatedUser.email || 'unknown'}`);
+  console.log(`   Phone Number: ${updatedUser.phoneNumber}`);
+  console.log(`   Phone Verified: ${updatedUser.phoneVerified}`);
 
   sendSuccess(res, null, "Phone verified successfully");
 });
@@ -281,16 +293,34 @@ export const registerUserController = asyncHandler(async (req, res) => {
       return sendError(res, "This email is already registered. Please use a different email or login.", 400);
     }
     // If user exists but registration not completed, check if they're trying to register with a different role
-    if (existingUser.role && existingUser.role !== role) {
-      return sendError(res, `This email is already associated with a ${existingUser.role} account. Please use a different email.`, 400);
+    // For expert userType, both speaker and trainer are valid and interchangeable
+    if (existingUser.role) {
+      const existingRole = String(existingUser.role).toLowerCase().trim();
+      const newRole = String(role).toLowerCase().trim();
+      
+      if (existingRole !== newRole) {
+        // Allow switching between speaker and trainer for expert userType
+        if (userType === 'expert' && 
+            ["speaker", "trainer"].includes(existingRole) && 
+            ["speaker", "trainer"].includes(newRole)) {
+          // Allow role switch between speaker and trainer
+          console.log(`✅ Allowing role switch from ${existingUser.role} to ${role} for expert userType`);
+        } else {
+          // Different role types - not allowed
+          return sendError(res, `This email is already associated with a ${existingUser.role} account. Please use a different email.`, 400);
+        }
+      }
     }
   }
+
+  // Normalize phone number (remove non-digits) to match verification format
+  const normalizedPhoneNumber = phoneNumber ? phoneNumber.replace(/\D/g, "") : null;
 
   // Build registration data
   const registrationData = {
     fullName,
     email,
-    phoneNumber: phoneNumber || null,
+    phoneNumber: normalizedPhoneNumber,
     role,
     password,
   };
@@ -349,9 +379,22 @@ export const registerUserController = asyncHandler(async (req, res) => {
       if (verifiedUser.emailVerified) {
         registrationData.emailVerified = true;
       }
-      if (verifiedUser.phoneVerified) {
+      // Check if phone number matches (normalized) - if so, preserve phoneVerified
+      const existingPhoneNormalized = verifiedUser.phoneNumber ? String(verifiedUser.phoneNumber).replace(/\D/g, "") : null;
+      const newPhoneNormalized = normalizedPhoneNumber ? String(normalizedPhoneNumber).replace(/\D/g, "") : null;
+      
+      if (verifiedUser.phoneVerified && existingPhoneNormalized && newPhoneNormalized && existingPhoneNormalized === newPhoneNormalized) {
+        // Phone number matches and was verified - preserve verification status
         registrationData.phoneVerified = true;
+        console.log(`✅ Preserving phoneVerified=true for phone: ${existingPhoneNormalized}`);
+      } else if (verifiedUser.phoneVerified) {
+        // Phone was verified but number might be different - still preserve if phone number is provided
+        registrationData.phoneVerified = true;
+        console.log(`✅ Preserving phoneVerified=true (phone number may have changed)`);
+      } else {
+        console.log(`⚠️ Phone not verified yet for user: ${email}`);
       }
+      
       // Update with registration data
       Object.assign(verifiedUser, registrationData);
       await verifiedUser.save();
@@ -365,6 +408,15 @@ export const registerUserController = asyncHandler(async (req, res) => {
 
   // Refresh user from database to get latest verification status
   user = await getUserByEmail(email);
+  
+  // Debug logging
+  console.log(`🔍 User verification status before completeRegistration:`);
+  console.log(`   Email: ${user.email}`);
+  console.log(`   Email Verified: ${user.emailVerified}`);
+  console.log(`   Phone Number: ${user.phoneNumber}`);
+  console.log(`   Phone Verified: ${user.phoneVerified}`);
+  console.log(`   Role: ${user.role}`);
+  console.log(`   Registration Completed: ${user.registrationCompleted}`);
 
   // Complete registration
   await completeRegistration(email, password, registrationData);
@@ -556,13 +608,25 @@ export const getCurrentUserController = asyncHandler(async (req, res) => {
   const { getOrCreateProfile } = await import("../../profile/services/profile.service.js");
   const profile = await getOrCreateProfile(user._id);
 
+  // Debug: Log user data to console
+  console.log("🔍 getCurrentUserController - User data:", {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+  });
+
   // Return response with user at top level (not wrapped in data)
   // This matches the frontend expectation: { success: true, user: {...} }
   res.status(200).json({
     success: true,
     user: {
       _id: user._id,
-      fullName: user.fullName,
+      firstName: user.firstName || null,
+      lastName: user.lastName || null,
+      fullName: user.fullName || null,
       email: user.email,
       phoneNumber: user.phoneNumber,
       role: user.role,

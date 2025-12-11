@@ -27,6 +27,25 @@ const ProfileDropdown = ({
   const finalUser = user || currentUserData?.user;
   const firstName = finalUser?.firstName || "";
   const lastName = finalUser?.lastName || "";
+  const fullName = finalUser?.fullName || "";
+
+  // Debug: Log user data
+  console.log("🔍 ProfileDropdown - User data:", {
+    finalUser,
+    firstName,
+    lastName,
+    fullName,
+  });
+
+  // Determine display name: prefer firstName + lastName, then fullName, then "User"
+  let displayName = "User";
+  if (firstName && lastName) {
+    displayName = `${firstName} ${lastName}`;
+  } else if (fullName) {
+    displayName = fullName;
+  }
+
+  console.log("🔍 ProfileDropdown - Final displayName:", displayName);
   const profileImageUrl = getProfileImageUrl(
     finalUser?.profileImageUrl || finalUser?.profileImage
   );
@@ -86,11 +105,11 @@ const ProfileDropdown = ({
               display: profileImageUrl ? "none" : "flex",
             }}
           >
-            {getUserInitials(firstName, lastName)}
+            {getUserInitials(firstName, lastName, fullName)}
           </div>
         </div>
         <h2 className="text-xs sm:text-sm font-medium truncate max-w-[60px] sm:max-w-[80px] md:max-w-none">
-          {firstName && lastName ? `${firstName} ${lastName}` : "User"}
+          {displayName}
         </h2>
         <IoIosArrowDown className="cursor-pointer w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
       </button>

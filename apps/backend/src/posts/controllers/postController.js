@@ -31,7 +31,9 @@ export const createPostController = asyncHandler(async (req, res) => {
 
   const { type, content, badge, badgeColor, hashtags, status, media } = req.body;
 
-  if (!content || !content.trim()) {
+  // Allow empty content only for drafts
+  const postStatus = status || "published";
+  if (postStatus !== "draft" && (!content || !content.trim())) {
     return sendValidationError(res, "Content is required");
   }
 
@@ -39,11 +41,11 @@ export const createPostController = asyncHandler(async (req, res) => {
     const post = await createPost({
       author: userId,
       type: type || "article",
-      content: content.trim(),
+      content: content ? content.trim() : "",
       badge,
       badgeColor,
       hashtags: Array.isArray(hashtags) ? hashtags : [],
-      status: status || "published",
+      status: postStatus,
       media: media || {},
     });
 

@@ -274,8 +274,16 @@ export const completeRegistration = async (email, password, additionalData = {})
       if (!user.emailVerified) {
         throw new Error("Email must be verified before completing registration");
       }
-      if (!user.phoneVerified && user.phoneNumber) {
+      // Check phone verification - phone is required for experts
+      if (user.phoneNumber && !user.phoneVerified) {
+        console.error(`❌ Phone verification check failed:`);
+        console.error(`   Phone Number: ${user.phoneNumber}`);
+        console.error(`   Phone Verified: ${user.phoneVerified}`);
         throw new Error("Phone must be verified before completing registration");
+      }
+      // If phone number is not provided, that's also an issue for experts
+      if (!user.phoneNumber) {
+        console.warn(`⚠️ Expert user ${user.email} has no phone number`);
       }
     }
 

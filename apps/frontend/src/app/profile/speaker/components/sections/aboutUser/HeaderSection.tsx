@@ -45,7 +45,8 @@ const HeaderSection = ({
 
   const firstName = auth.user?.firstName || currentUserData?.user?.firstName;
   const lastName = auth.user?.lastName || currentUserData?.user?.lastName;
-  const initials = getUserInitials(firstName, lastName);
+  const fullName = auth.user?.fullName || currentUserData?.user?.fullName;
+  const initials = getUserInitials(firstName, lastName, fullName);
 
   return (
     <motion.div

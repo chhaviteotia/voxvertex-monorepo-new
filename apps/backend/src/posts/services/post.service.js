@@ -30,8 +30,13 @@ export const createPost = async (postData) => {
     media = {},
   } = postData;
 
-  if (!author || !content) {
-    throw new Error("Author and content are required");
+  if (!author) {
+    throw new Error("Author is required");
+  }
+
+  // Allow empty content only for drafts
+  if (status !== "draft" && (!content || !content.trim())) {
+    throw new Error("Content is required for published posts");
   }
 
   if (!isValidId(author)) {
@@ -41,7 +46,7 @@ export const createPost = async (postData) => {
   const post = new Post({
     author: normalizeId(author),
     type,
-    content,
+    content: content || "",
     badge,
     badgeColor,
     hashtags: Array.isArray(hashtags) ? hashtags : [],

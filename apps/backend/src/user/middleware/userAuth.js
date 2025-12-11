@@ -14,7 +14,15 @@ export const authenticateUser = async (req, res, next) => {
     const userType = req.params.userType || 'expert';
     
     // Get token from header first (works for all user types)
-    let token = req.header('Authorization')?.replace('Bearer ', '');
+    // Try multiple methods to extract Authorization header
+    let token = req.header('Authorization') || 
+                req.headers['authorization'] || 
+                req.headers['Authorization'];
+    
+    // Remove 'Bearer ' prefix if present
+    if (token) {
+      token = token.replace(/^Bearer\s+/i, '').trim();
+    }
     
     // If no header token, try cookies - check all possible user types
     if (!token) {
@@ -79,6 +87,13 @@ export const authenticateUser = async (req, res, next) => {
     try {
       const decoded = verifyAccessToken(token);
       
+      if (!decoded || !decoded.email) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token format'
+        });
+      }
+      
       // Get user from database
       const user = await getUserByEmail(decoded.email);
       
@@ -123,9 +138,14 @@ export const authenticateUser = async (req, res, next) => {
       
       next();
     } catch (tokenError) {
+      console.error('Token verification error:', tokenError.message);
+      // Provide more specific error messages
+      const errorMessage = tokenError.message || 'Invalid or expired token';
       return res.status(401).json({
         success: false,
-        message: 'Invalid or expired token'
+        message: errorMessage.includes('expired') ? 'Token has expired. Please login again.' : 
+                 errorMessage.includes('invalid') ? 'Invalid token. Please login again.' :
+                 'Invalid or expired token'
       });
     }
   } catch (error) {

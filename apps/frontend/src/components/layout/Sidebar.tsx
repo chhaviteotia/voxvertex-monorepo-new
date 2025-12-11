@@ -16,6 +16,7 @@ import { FaMoneyBillTrendUp } from "react-icons/fa6";
 import { BiSupport } from "react-icons/bi";
 import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";
+import { useGetUnreadCountQuery } from "@/store/api/messagesApi";
 import { cloneElement, isValidElement, ReactElement } from "react";
 
 /**
@@ -28,14 +29,23 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const { data: currentUserData } = useGetCurrentUserQuery();
 
-  // Get user details with fallback
+  // Get user details with fallback - prioritize firstName + lastName, then fullName
+  let userName = "User";
+  if (user?.firstName && user?.lastName) {
+    userName = `${user.firstName} ${user.lastName}`;
+  } else if (
+    currentUserData?.user?.firstName &&
+    currentUserData?.user?.lastName
+  ) {
+    userName = `${currentUserData.user.firstName} ${currentUserData.user.lastName}`;
+  } else if (user?.fullName) {
+    userName = user.fullName;
+  } else if (currentUserData?.user?.fullName) {
+    userName = currentUserData.user.fullName;
+  }
+
   const userDetails = {
-    name:
-      user?.firstName && user?.lastName
-        ? `${user.firstName} ${user.lastName}`
-        : currentUserData?.user?.firstName && currentUserData?.user?.lastName
-        ? `${currentUserData.user.firstName} ${currentUserData.user.lastName}`
-        : "User",
+    name: userName,
     email: user?.email || currentUserData?.user?.email || "user@example.com",
     profileImageUrl:
       user?.profileImageUrl || currentUserData?.user?.profileImageUrl || null,
@@ -55,6 +65,14 @@ const Sidebar = () => {
   const isParticipant = role === "participant";
   const isSpeaker = role === "speaker";
   const isOrganizer = role === "organizer";
+
+  // Get unread message count (skip for participants as they don't have messages)
+  const { data: unreadCountData } = useGetUnreadCountQuery(undefined, {
+    skip: isParticipant,
+    pollingInterval: 30000, // Poll every 30 seconds to update count
+  });
+
+  const unreadCount = unreadCountData?.data?.count || 0;
 
   // Get profile redirect based on role
   const getProfileRedirect = (): string => {
@@ -137,6 +155,7 @@ const Sidebar = () => {
           href: "/messages",
           active:
             currentPath === "/messages" || currentPath.startsWith("/messages"),
+          badge: unreadCount > 0 ? unreadCount : undefined,
         },
         {
           icon: <IoCalendarOutline />,
@@ -158,7 +177,9 @@ const Sidebar = () => {
           icon: <Cpu />,
           label: "Tech Readiness",
           href: "/readiness_testing/speaker",
-          active: currentPath.startsWith("/readiness_testing"),
+          active:
+            currentPath.startsWith("/readiness_testing") ||
+            currentPath.startsWith("/profile/speaker/readiness"),
           disabled: !isSpeaker,
         },
         eventsItem,
@@ -210,7 +231,7 @@ const Sidebar = () => {
 
   return (
     <div
-      className="fixed top-20 sm:top-24 md:top-28 lg:top-32 border-2 left-2 sm:left-4 md:left-6 w-64 sm:w-72 md:w-72 bg-white shadow-md z-50 rounded-lg sm:rounded-xl"
+      className="fixed top-20 sm:top-24 md:top-28 lg:top-32 border-2 left-2 sm:left-4 md:left-6 w-64 sm:w-72 md:w-72 bg-white shadow-md z-[98] rounded-lg sm:rounded-xl"
       style={{ height: "calc(100vh - 142px)" }}
     >
       <div className="p-6 h-full flex flex-col">
@@ -251,9 +272,14 @@ const Sidebar = () => {
                 suppressHydrationWarning
               >
                 {renderIcon(item.icon)}
-                <span className="text-sm font-medium leading-5">
+                <span className="text-sm font-medium leading-5 flex-1">
                   {item.label}
                 </span>
+                {item.badge && item.badge > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs font-semibold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
               </div>
             );
           })}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Brain } from "lucide-react";
-import SectionHeader from "../common/SectionHeader";
+import SectionHeader from "../../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchProfile,

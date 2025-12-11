@@ -9,12 +9,15 @@ import {
   Bookmark,
   Eye,
   Send,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
 import {
   useToggleLikePostMutation,
   useAddCommentMutation,
   useSharePostMutation,
   useGetPostByIdQuery,
+  useDeletePostMutation,
 } from "@/store/api/postsApi";
 import { useExpertAuth } from "@/store/hooks/expertAuth";
 import { formatRelativeTime } from "@/utils/timeUtils";
@@ -34,6 +37,7 @@ interface Post {
     role: string;
     avatar: string;
     verified: boolean;
+    _id?: string; // Author ID for ownership check
   };
   timestamp: string;
   createdAt?: string; // ISO date string for calculating relative time
@@ -56,6 +60,7 @@ interface PostCardProps {
   currentUserAvatar?: string;
   currentUserName?: string;
   onLikeToggle?: () => void; // Callback to notify parent of like/unlike
+  onDelete?: () => void; // Callback to notify parent of post deletion
 }
 
 export default function PostCard({
@@ -63,12 +68,14 @@ export default function PostCard({
   currentUserAvatar = "PS",
   currentUserName = "User",
   onLikeToggle,
+  onDelete,
 }: PostCardProps) {
   const { user } = useExpertAuth();
   const [showComments, setShowComments] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<PostComment[]>(post.comments || []);
+  const [showMenu, setShowMenu] = useState(false);
   const [localLikedBy, setLocalLikedBy] = useState<string[]>(() => {
     // Normalize likedBy array to strings
     if (!post.likedBy || post.likedBy.length === 0) return [];
@@ -83,6 +90,7 @@ export default function PostCard({
     useToggleLikePostMutation();
   const [addComment, { isLoading: isAddingComment }] = useAddCommentMutation();
   const [sharePost, { isLoading: isSharing }] = useSharePostMutation();
+  const [deletePost, { isLoading: isDeleting }] = useDeletePostMutation();
 
   // Track if we're in the middle of a like operation to prevent reset
   const [isLikeOperationInProgress, setIsLikeOperationInProgress] =
@@ -407,6 +415,35 @@ export default function PostCard({
     purple: "bg-purple-100 text-purple-700 border-purple-200",
   };
 
+  // Check if current user is the author of the post
+  const isPostOwner = useMemo(() => {
+    if (!user?._id || !post.author._id) {
+      // Fallback to name comparison if IDs not available
+      return post.author.name === currentUserName;
+    }
+    const userIdStr =
+      typeof user._id === "string" ? user._id : String(user._id);
+    const authorIdStr =
+      typeof post.author._id === "string"
+        ? post.author._id
+        : String(post.author._id);
+    return userIdStr === authorIdStr;
+  }, [user?._id, post.author._id, post.author.name, currentUserName]);
+
+  const handleDeletePost = async () => {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+
+    try {
+      await deletePost(post.id).unwrap();
+      if (onDelete) {
+        onDelete();
+      }
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      alert("Failed to delete post. Please try again.");
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border-2 border-gray-300 p-6 shadow-sm">
       {/* Author Info */}
@@ -436,6 +473,36 @@ export default function PostCard({
           >
             {post.badge}
           </span>
+          {/* Three-dot menu - only show for post owner */}
+          {isPostOwner && (
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="More options"
+              >
+                <MoreVertical className="w-5 h-5 text-gray-600" />
+              </button>
+              {showMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <div className="absolute right-0 top-8 z-20 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]">
+                    <button
+                      onClick={handleDeletePost}
+                      disabled={isDeleting}
+                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Post
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

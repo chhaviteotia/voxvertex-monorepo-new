@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -22,11 +22,14 @@ import {
 } from "lucide-react";
 import PostCreateInput from "./PostCreateInput";
 import PostCard from "./PostCard";
+import DraftCard from "./DraftCard";
 import CreatePostModal from "./CreatePostModal";
 import {
   useGetPostStatsQuery,
   useGetUserPostsQuery,
   useCreatePostMutation,
+  useUpdatePostMutation,
+  useDeletePostMutation,
   type Post,
 } from "@/store/api/postsApi";
 import { useExpertAuth } from "@/store/hooks/expertAuth";
@@ -43,12 +46,22 @@ export default function PostsPage({ user }: PostsPageProps) {
   );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedPostType, setSelectedPostType] = useState<string | null>(null);
   const [showTypeFilter, setShowTypeFilter] = useState(false);
   const [sortOrder, setSortOrder] = useState<
     "recent" | "oldest" | "mostLiked" | "mostViewed" | "mostEngaged"
   >("recent");
   const [showSortFilter, setShowSortFilter] = useState(false);
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Helper function to get user initials
   const getUserInitials = (name?: string): string => {
@@ -94,17 +107,23 @@ export default function PostsPage({ user }: PostsPageProps) {
     isLoading: postsLoading,
     refetch: refetchPosts,
   } = useGetUserPostsQuery({ status: "published" });
-  const { data: draftPostsData, isLoading: draftsLoading } =
-    useGetUserPostsQuery({ status: "draft" });
+  const {
+    data: draftPostsData,
+    isLoading: draftsLoading,
+    refetch: refetchDrafts,
+  } = useGetUserPostsQuery({ status: "draft" });
   const { data: allPostsData, isLoading: allPostsLoading } =
     useGetUserPostsQuery({
       status: "published",
       limit: 50,
       type: selectedPostType || undefined,
-      search: searchTerm || undefined,
+      search: debouncedSearchTerm || undefined,
       sortBy: sortOrder,
     });
   const [createPost, { isLoading: isCreatingPost }] = useCreatePostMutation();
+  const [updatePost] = useUpdatePostMutation();
+  const [deletePost] = useDeletePostMutation();
+  const [editingDraft, setEditingDraft] = useState<any>(null);
 
   // Map post type to badge
   const getBadgeFromType = (
@@ -138,6 +157,7 @@ export default function PostsPage({ user }: PostsPageProps) {
         role: apiPost.author.professionalTitle || apiPost.author.role,
         avatar: authorInitials,
         verified: apiPost.author.verified || false,
+        _id: apiPost.author._id,
       },
       timestamp: apiPost.createdAt
         ? formatRelativeTime(apiPost.createdAt)
@@ -193,7 +213,7 @@ export default function PostsPage({ user }: PostsPageProps) {
     { id: "video", label: "Video", icon: Video, color: "text-purple-600" },
     {
       id: "celebrate",
-      label: "Achievement",
+      label: "Celebrate",
       icon: Trophy,
       color: "text-teal-600",
     },
@@ -206,24 +226,11 @@ export default function PostsPage({ user }: PostsPageProps) {
     { id: "event", label: "Event", icon: Calendar, color: "text-purple-600" },
   ];
 
-  // Posts are already sorted by backend, just filter by search if needed
+  // Posts are already filtered and sorted by backend based on searchTerm, selectedPostType, and sortOrder
+  // No need for additional client-side filtering since API handles it
   const filteredAllPosts = useMemo(() => {
-    let filtered = allPosts;
-
-    // Filter by search term (if not already filtered by API)
-    // Only do client-side filtering if search is not sent to API
-    if (searchTerm && !selectedPostType) {
-      filtered = filtered.filter(
-        (post) =>
-          post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          post.hashtags.some((tag) =>
-            tag.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-      );
-    }
-
-    return filtered;
-  }, [allPosts, searchTerm, selectedPostType]);
+    return allPosts;
+  }, [allPosts]);
 
   const selectedTypeLabel = selectedPostType
     ? postTypeOptions.find((opt) => opt.id === selectedPostType)?.label ||
@@ -268,6 +275,160 @@ export default function PostsPage({ user }: PostsPageProps) {
     }
   };
 
+  const handleSaveDraft = async (data: {
+    type: string;
+    content: string;
+    tags: string;
+  }) => {
+    try {
+      const hashtags = data.tags
+        ? data.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : [];
+
+      if (editingDraft) {
+        // Update existing draft
+        await updatePost({
+          postId: editingDraft.id,
+          data: {
+            type: data.type as any,
+            content: data.content,
+            hashtags,
+            status: "draft",
+          },
+        }).unwrap();
+        setEditingDraft(null);
+      } else {
+        // Create new draft
+        await createPost({
+          type: data.type as any,
+          content: data.content,
+          hashtags,
+          status: "draft",
+        }).unwrap();
+      }
+
+      setIsCreateModalOpen(false);
+      // Refetch drafts to show the updated/newly saved draft
+      refetchDrafts();
+    } catch (error) {
+      console.error("Failed to save draft:", error);
+    }
+  };
+
+  const handlePublishDraft = async (draftId: string) => {
+    try {
+      const draft = drafts.find((d) => d.id === draftId);
+      if (!draft) return;
+
+      await updatePost({
+        postId: draftId,
+        data: {
+          status: "published",
+        },
+      }).unwrap();
+
+      // Refetch both posts and drafts
+      refetchPosts();
+      refetchDrafts();
+      refetchStats();
+    } catch (error) {
+      console.error("Failed to publish draft:", error);
+    }
+  };
+
+  const handleEditDraft = (draft: any) => {
+    // Find the full draft data from the API
+    const fullDraft = draftPostsData?.data?.posts?.find(
+      (p: any) => p._id === draft.id
+    );
+    setEditingDraft({
+      ...draft,
+      type: fullDraft?.type || draft.type || "article",
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleDeleteDraft = async (draftId: string) => {
+    if (!confirm("Are you sure you want to delete this draft?")) return;
+
+    try {
+      await deletePost(draftId).unwrap();
+      refetchDrafts();
+    } catch (error) {
+      console.error("Failed to delete draft:", error);
+    }
+  };
+
+  const handleExportPosts = () => {
+    // Get the filtered posts to export
+    const postsToExport =
+      filteredAllPosts.length > 0 ? filteredAllPosts : allPosts;
+
+    if (postsToExport.length === 0) {
+      alert("No posts to export");
+      return;
+    }
+
+    // Prepare CSV data
+    const headers = [
+      "Title",
+      "Type",
+      "Content",
+      "Hashtags",
+      "Likes",
+      "Views",
+      "Comments",
+      "Shares",
+      "Created At",
+    ];
+    const rows = postsToExport.map((post) => {
+      const content = post.content.replace(/\n/g, " ").replace(/,/g, ";"); // Replace commas and newlines
+      const hashtags = post.hashtags.join("; ");
+      const createdAt = post.createdAt
+        ? new Date(post.createdAt).toLocaleString()
+        : post.timestamp;
+
+      return [
+        post.badge || "Post",
+        post.badge || "article",
+        content,
+        hashtags,
+        post.metrics.likes.toString(),
+        post.metrics.views.toString(),
+        post.metrics.comments.toString(),
+        post.metrics.shares.toString(),
+        createdAt,
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `posts_export_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  };
+
   const userInitials = getUserInitials(user?.fullName);
 
   // Show "View All Posts" view
@@ -287,7 +448,10 @@ export default function PostsPage({ user }: PostsPageProps) {
                   <ArrowLeft className="w-4 h-4" />
                   <span className="font-medium">Back to Profile</span>
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium">
+                <button
+                  onClick={handleExportPosts}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium"
+                >
                   <Download className="w-4 h-4" />
                   Export Posts
                 </button>
@@ -579,8 +743,13 @@ export default function PostsPage({ user }: PostsPageProps) {
           {/* Create Post Modal */}
           <CreatePostModal
             isOpen={isCreateModalOpen}
-            onClose={() => setIsCreateModalOpen(false)}
+            onClose={() => {
+              setIsCreateModalOpen(false);
+              setEditingDraft(null);
+            }}
             onPublish={handleCreatePost}
+            onSaveDraft={handleSaveDraft}
+            editingDraft={editingDraft}
           />
 
           {/* Tabs and View All Button */}
@@ -594,7 +763,7 @@ export default function PostsPage({ user }: PostsPageProps) {
                     : "bg-white text-gray-700 hover:bg-gray-50 border-gray-300"
                 }`}
               >
-                My Posts ({activeTab === "posts" ? posts.length : 0})
+                My Posts ({posts.length})
               </button>
               <button
                 onClick={() => setActiveTab("drafts")}
@@ -634,6 +803,7 @@ export default function PostsPage({ user }: PostsPageProps) {
                     currentUserAvatar={userInitials}
                     currentUserName={authorInfo.name}
                     onLikeToggle={refetchStats}
+                    onDelete={refetchPosts}
                   />
                 ))
               ) : (
@@ -646,15 +816,24 @@ export default function PostsPage({ user }: PostsPageProps) {
                 Loading drafts...
               </div>
             ) : drafts.length > 0 ? (
-              drafts.map((draft) => (
-                <PostCard
-                  key={draft.id}
-                  post={draft}
-                  currentUserAvatar={userInitials}
-                  currentUserName={authorInfo.name}
-                  onLikeToggle={refetchStats}
-                />
-              ))
+              <div className="space-y-4">
+                {(draftPostsData?.data?.posts || []).map((draft: any) => (
+                  <DraftCard
+                    key={draft._id}
+                    draft={{
+                      id: draft._id,
+                      type: draft.type || "article",
+                      content: draft.content || "",
+                      hashtags: draft.hashtags || [],
+                      createdAt: draft.createdAt,
+                      updatedAt: draft.updatedAt || draft.createdAt,
+                    }}
+                    onPublish={handlePublishDraft}
+                    onEdit={handleEditDraft}
+                    onDelete={handleDeleteDraft}
+                  />
+                ))}
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 px-4">
                 <FileText className="w-24 h-24 text-gray-300 mb-6" />

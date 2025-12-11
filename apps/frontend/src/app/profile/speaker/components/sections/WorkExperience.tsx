@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MdWork } from "react-icons/md";
-import SectionHeader from "../common/SectionHeader";
+import SectionHeader from "../../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchProfile,

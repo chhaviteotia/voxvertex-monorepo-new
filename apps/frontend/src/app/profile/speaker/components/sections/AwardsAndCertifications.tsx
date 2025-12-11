@@ -1,27 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { GraduationCap } from "lucide-react";
-import SectionHeader from "../common/SectionHeader";
+import { Award } from "lucide-react";
+import SectionHeader from "../../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchProfile,
-  removeEducationEntry,
+  removeAwardEntry,
   selectProfile,
 } from "@/store/slices/profileSlice";
-import AddEducationModal from "../modals/AddEducationModal";
+import AddAwardModal from "../modals/AddAwardModal";
 
 /**
- * Education Component - Using Redux
- * Displays and manages education entries
+ * AwardsAndCertifications Component - Using Redux
+ * Displays and manages awards and certifications
  */
-const Education = () => {
+const AwardsAndCertifications = () => {
   const dispatch = useAppDispatch();
   const { data: profile, status } = useAppSelector(selectProfile);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEducation, setEditingEducation] = useState<any>(null);
+  const [editingAward, setEditingAward] = useState<any>(null);
 
-  const educations = profile?.education || [];
+  const awards = profile?.awards || [];
   const isLoading = status === "loading" || status === "idle";
 
   useEffect(() => {
@@ -30,22 +30,22 @@ const Education = () => {
     }
   }, [dispatch, profile]);
 
-  const handleDelete = async (educationId: string) => {
+  const handleDelete = async (awardId: string) => {
     try {
-      await dispatch(removeEducationEntry(educationId)).unwrap();
+      await dispatch(removeAwardEntry(awardId)).unwrap();
       // Profile state automatically updates
     } catch (error) {
-      console.error("Error deleting education:", error);
+      console.error("Error deleting award:", error);
     }
   };
 
   const handleAddClick = () => {
-    setEditingEducation(null);
+    setEditingAward(null);
     setIsModalOpen(true);
   };
 
-  const handleEdit = (edu: any) => {
-    setEditingEducation(edu);
+  const handleEdit = (award: any) => {
+    setEditingAward(award);
     setIsModalOpen(true);
   };
 
@@ -55,23 +55,23 @@ const Education = () => {
   };
 
   return (
-    <div className="w-full bg-[#ffffff] py-4 shadow-md rounded-[13.01px] rounded-tl-none rounded-bl-none">
+    <section className="w-full bg-[#ffffff] py-4 shadow-md rounded-[13.01px] rounded-tl-none rounded-bl-none">
       <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6">
         <SectionHeader
-          id="education"
-          icon={<GraduationCap />}
-          title="Education"
-          subTitle="Academic background and qualifications"
+          id="awardsAndCertifications"
+          icon={<Award />}
+          title="Awards & Certifications"
+          subTitle="Recognition and achievements"
           onAddClick={handleAddClick}
         />
 
-        <div className="space-y-6 my-12">
+        <div className="space-y-2 my-12">
           {isLoading ? (
-            <div className="space-y-6 animate-pulse">
+            <div className="space-y-2 animate-pulse">
               {[1, 2].map((i) => (
                 <div
                   key={i}
-                  className="flex justify-between items-center pb-4 border-b-2 border-[#FF6B35]/9"
+                  className="flex justify-between items-center py-4 border-b border-orange-100"
                 >
                   <div className="flex-1">
                     <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -81,35 +81,33 @@ const Education = () => {
                 </div>
               ))}
             </div>
-          ) : educations.length > 0 ? (
-            educations.map((edu, index) => (
+          ) : awards.length > 0 ? (
+            awards.map((award, index) => (
               <div
-                key={edu._id || index}
-                className="flex justify-between items-start pb-4 border-b-2 border-[#FF6B35]/9"
+                key={award._id || index}
+                className="flex justify-between items-start py-4 border-b border-orange-100"
               >
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {edu.degree}
+                    {award.title}
                   </h3>
-                  <p className="text-gray-600">{edu.institution}</p>
-                  <p className="text-sm text-gray-500">
-                    {edu.field} • {edu.start} - {edu.end || "Present"}
-                  </p>
-                  {edu.grade && (
+                  <p className="text-gray-600">{award.issuer}</p>
+                  <p className="text-sm text-gray-500">{award.date}</p>
+                  {award.description && (
                     <p className="text-sm text-gray-600 mt-1">
-                      Grade: {edu.grade}
+                      {award.description}
                     </p>
                   )}
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleEdit(edu)}
+                    onClick={() => handleEdit(award)}
                     className="text-blue-600 hover:text-blue-800 text-sm"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(edu._id)}
+                    onClick={() => handleDelete(award._id)}
                     className="text-red-600 hover:text-red-800 text-sm"
                   >
                     Delete
@@ -119,7 +117,7 @@ const Education = () => {
             ))
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No education entries added yet.</p>
+              <p>No awards or certifications added yet.</p>
               <p className="text-sm mt-1">
                 Click the "+" button to add your first one!
               </p>
@@ -128,18 +126,18 @@ const Education = () => {
         </div>
       </div>
 
-      <AddEducationModal
+      <AddAwardModal
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
-          setEditingEducation(null);
+          setEditingAward(null);
         }}
         onSave={handleSave}
-        editingEducation={editingEducation}
+        editingAward={editingAward}
         isLoading={status === "loading"}
       />
-    </div>
+    </section>
   );
 };
 
-export default Education;
+export default AwardsAndCertifications;

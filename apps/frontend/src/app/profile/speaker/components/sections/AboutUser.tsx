@@ -7,8 +7,8 @@ import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";
 import dynamic from "next/dynamic";
 import HeaderSection from "./aboutUser/HeaderSection";
-import InfoCard from "../common/InfoCard";
-import ContactCard from "../common/ContactCard";
+import InfoCard from "../../../components/common/InfoCard";
+import ContactCard from "../../../components/common/ContactCard";
 
 // Custom inline SVG as a React component
 const EventIcon = ({ className }: { className?: string }) => (
@@ -72,14 +72,16 @@ const AboutUser = memo(() => {
     const user = currentUserData?.user || auth.user;
     const userId = user?._id || user?.id || null;
 
-    // If user ID hasn't changed and we've already processed it, skip
+    // If no user ID, use default data but don't keep loading
     if (!userId) {
-      setIsLoading(true);
+      setUserData(defaultData);
+      setIsLoading(false);
       return;
     }
 
     // Skip if this is the same user we just processed
     if (lastProcessedUserIdRef.current === userId) {
+      setIsLoading(false);
       return;
     }
 
@@ -89,12 +91,30 @@ const AboutUser = memo(() => {
       ((user as any).roleSpecificData?.activities || []).slice(0, 5) ||
       defaultData.domains;
 
-    // Prepare user data
+    // Prepare user data - prioritize firstName + lastName, then fullName, then default
+    let userName = defaultData.name;
+    const firstName = (user as any).firstName || "";
+    const lastName = (user as any).lastName || "";
+    const fullName = (user as any).fullName || "";
+
+    // Debug: Log user data
+    console.log("🔍 AboutUser - User data:", {
+      firstName,
+      lastName,
+      fullName,
+      user: user,
+    });
+
+    if (firstName && lastName) {
+      userName = `${firstName} ${lastName}`.trim();
+    } else if (fullName) {
+      userName = fullName;
+    }
+
+    console.log("🔍 AboutUser - Final userName:", userName);
+
     const dynamicUserData = {
-      name:
-        `${(user as any).firstName || ""} ${
-          (user as any).lastName || ""
-        }`.trim() || defaultData.name,
+      name: userName,
       role:
         (user as any).professionalTitle ||
         ((user as any).role === "speaker"
@@ -132,8 +152,8 @@ const AboutUser = memo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserData?.user?._id, auth.user?._id]);
 
-  // Show loading state
-  if (isLoading || isUserLoading || !userData) {
+  // Show loading state only if we're actually loading and don't have user data yet
+  if ((isLoading || isUserLoading) && !currentUserData?.user && !auth.user) {
     return (
       <div className="w-full h-auto bg-[#FFFDFB] shadow-md rounded-lg p-4 animate-pulse">
         <div className="h-40 bg-gray-200 rounded mb-4"></div>

@@ -79,11 +79,13 @@ export const getProfileImageUrl = (
  * Get user initials from name
  * @param firstName - First name
  * @param lastName - Last name
+ * @param fullName - Full name (fallback if firstName/lastName not available)
  * @returns Initials string (max 2 characters)
  */
 export const getUserInitials = (
   firstName?: string,
-  lastName?: string
+  lastName?: string,
+  fullName?: string
 ): string => {
   if (firstName && lastName) {
     return `${firstName[0]}${lastName[0]}`.toUpperCase();
@@ -93,6 +95,16 @@ export const getUserInitials = (
   }
   if (lastName) {
     return lastName[0].toUpperCase();
+  }
+  // Fallback to fullName if available
+  if (fullName) {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    if (parts.length === 1) {
+      return parts[0][0].toUpperCase();
+    }
   }
   return "U";
 };

@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import userRoutes from './user/routes/userRoutes.js';
 import profileRoutes from './profile/routes/profileRoutes.js';
 import postRoutes from './posts/routes/postRoutes.js';
+import messageRoutes from './messages/routes/conversationRoutes.js';
+import marketplaceRoutes from './marketplace/routes/marketplaceRoutes.js';
 import connectDB from './configs/dbConnect.js';
 import { connectCloudinary } from './configs/cloudinary.config.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
@@ -50,6 +52,10 @@ app.get('/health', (req, res) => {
 // Routes: /api/user/:userType/*
 app.use('/api/user', userRoutes);
 
+// Auth routes alias for backward compatibility
+// Routes: /api/auth/*
+app.use('/api/auth', userRoutes);
+
 // Profile routes (supports expert, organiser, participant)
 // Routes: /api/profile/:userType/*
 app.use('/api/profile', profileRoutes);
@@ -57,6 +63,14 @@ app.use('/api/profile', profileRoutes);
 // Post routes
 // Routes: /api/posts/*
 app.use('/api/posts', postRoutes);
+
+// Message routes
+// Routes: /api/messages/*
+app.use('/api/messages', messageRoutes);
+
+// Marketplace routes
+// Routes: /api/marketplace/*
+app.use('/api/marketplace', marketplaceRoutes);
 
 // 404 handler (must be before error handler)
 app.use(notFoundHandler);
