@@ -1,7 +1,7 @@
 "use client";
 
 import { CiFileOn } from "react-icons/ci";
-import EventIcon from "../../../../components/common/EventIcon";
+import EventIcon from "../../../components/common/EventIcon";
 
 interface PostHeaderProps {
   recentPosts: any[];

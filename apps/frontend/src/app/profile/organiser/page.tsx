@@ -9,14 +9,7 @@ import AwardsAndCertifications from "../components/sections/AwardsAndCertificati
 import FeaturedVideos from "../components/sections/FeaturedVideos";
 import Reviews from "../components/sections/Reviews";
 
-// Dynamic imports matching the backup code structure
-const Calendar = dynamic(() => import("./components/sections/Calendar/index"), {
-  loading: () => (
-    <div className="bg-white p-6 animate-pulse h-64 rounded-lg"></div>
-  ),
-  ssr: false,
-});
-
+// Dynamic imports matching the speaker profile structure
 const Posts = dynamic(() => import("../components/sections/Posts/index"), {
   loading: () => (
     <div className="bg-white p-6 animate-pulse h-64 rounded-lg"></div>
@@ -25,12 +18,12 @@ const Posts = dynamic(() => import("../components/sections/Posts/index"), {
 });
 
 /**
- * Speaker Profile Page - Matches backup code structure
- * Displays all profile sections in the exact order from backup:
- * AboutUser -> Calendar -> Posts -> WorkExperience -> Education ->
- * AwardsAndCertifications -> FeaturedVideos -> FeedbackReviews
+ * Organiser Profile Page - Uses shared components with speaker profile
+ * Displays all profile sections in order:
+ * AboutUser -> Posts -> WorkExperience -> Education ->
+ * AwardsAndCertifications -> FeaturedVideos -> Reviews
  */
-export default function SpeakerProfilePage() {
+export default function OrganiserProfilePage() {
   return (
     <main className="flex flex-col items-center justify-between gap-5 px-0">
       <Suspense
@@ -39,14 +32,6 @@ export default function SpeakerProfilePage() {
         }
       >
         <AboutUser />
-      </Suspense>
-
-      <Suspense
-        fallback={
-          <div className="bg-white p-6 animate-pulse h-64 rounded-lg"></div>
-        }
-      >
-        <Calendar />
       </Suspense>
 
       <Suspense

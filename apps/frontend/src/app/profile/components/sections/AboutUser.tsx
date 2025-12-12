@@ -7,8 +7,8 @@ import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";
 import dynamic from "next/dynamic";
 import HeaderSection from "./aboutUser/HeaderSection";
-import InfoCard from "../../../components/common/InfoCard";
-import ContactCard from "../../../components/common/ContactCard";
+import InfoCard from "../../components/common/InfoCard";
+import ContactCard from "../../components/common/ContactCard";
 
 // Custom inline SVG as a React component
 const EventIcon = ({ className }: { className?: string }) => (
@@ -119,6 +119,9 @@ const AboutUser = memo(() => {
         (user as any).professionalTitle ||
         ((user as any).role === "speaker"
           ? "Professional Speaker"
+          : (user as any).role === "organizer" ||
+            (user as any).role === "organiser"
+          ? "Event Organiser"
           : (user as any).role) ||
         defaultData.role,
       description: (user as any).bio || defaultData.description,

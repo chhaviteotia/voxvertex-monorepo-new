@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Video } from "lucide-react";
-import SectionHeader from "../../../components/common/SectionHeader";
+import SectionHeader from "../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchProfile,
   removeVideoEntry,
   selectProfile,
 } from "@/store/slices/profileSlice";
-import AddVideoModal from "../modals/AddVideoModal";
+import AddVideoModal from "../../speaker/components/modals/AddVideoModal";
 
 /**
  * FeaturedVideos Component - Using Redux

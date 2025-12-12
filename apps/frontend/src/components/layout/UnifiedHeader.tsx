@@ -116,7 +116,7 @@ const UnifiedHeader: React.FC<UnifiedHeaderProps> = ({
   const renderAuthenticatedHeader = () => (
     <header className="fixed border-2 top-2 sm:top-4 left-2 sm:left-4 md:left-6 right-2 sm:right-4 md:right-8 w-auto h-20 sm:h-24 bg-[#FFFFFF] flex items-center justify-between text-[#000000] shadow-sm rounded-xl sm:rounded-2xl z-[100] px-2 sm:px-4 md:px-6 backdrop-blur-sm">
       <div className="flex items-center">
-        <div onClick={() => router.push("/home")} className="cursor-pointer">
+        <div onClick={() => router.push("/")} className="cursor-pointer">
           <Logo />
         </div>
       </div>

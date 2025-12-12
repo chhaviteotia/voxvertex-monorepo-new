@@ -56,7 +56,8 @@ const ProfileDropdown = ({
       case "speaker":
         return "/profile/speaker";
       case "organizer":
-        return "/profile/organizer";
+      case "organiser":
+        return "/profile/organiser";
       case "participant":
         return "/profile/participant";
       default:

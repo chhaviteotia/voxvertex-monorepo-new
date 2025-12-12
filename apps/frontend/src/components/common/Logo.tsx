@@ -13,11 +13,7 @@ interface LogoProps {
  * Logo Component - Improved with TypeScript and better structure
  * Handles logo display with fallback to text
  */
-const Logo = ({
-  className = "",
-  absolute = false,
-  href = "/home",
-}: LogoProps) => {
+const Logo = ({ className = "", absolute = false, href = "/" }: LogoProps) => {
   const [imageError, setImageError] = useState(false);
 
   const handleImageError = () => {
@@ -32,7 +28,7 @@ const Logo = ({
     <Link href={href} className={baseClasses} aria-label="VoxVertex Home">
       {!imageError ? (
         <img
-          src="/logo.svg"
+          src="/voxvertex-logo.png"
           alt="VoxVertex Logo"
           className="w-full h-full object-contain"
           onError={handleImageError}

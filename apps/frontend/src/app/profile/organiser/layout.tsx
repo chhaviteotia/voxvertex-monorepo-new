@@ -6,11 +6,11 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 
 /**
- * Speaker Profile Layout - Clean layout matching the trainer profile UI
+ * Organiser Profile Layout - Clean layout matching the trainer/speaker profile UI
  * Sidebar on left, simple top header, content on right
  * Fully responsive
  */
-export default function SpeakerProfileLayout({
+export default function OrganiserProfileLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -52,7 +52,7 @@ export default function SpeakerProfileLayout({
 
         {/* Main Content Area */}
         <div className="flex-1 w-full lg:ml-64 min-h-screen">
-          {/* Top Header Bar - Matching the trainer profile design */}
+          {/* Top Header Bar - Matching the trainer/speaker profile design */}
           <Header
             title={
               pathname?.includes("/posts")

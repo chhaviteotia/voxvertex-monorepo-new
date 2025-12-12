@@ -64,7 +64,7 @@ const Sidebar = () => {
   const role = getUserRole();
   const isParticipant = role === "participant";
   const isSpeaker = role === "speaker";
-  const isOrganizer = role === "organizer";
+  const isOrganizer = role === "organizer" || role === "organiser";
 
   // Get unread message count (skip for participants as they don't have messages)
   const { data: unreadCountData } = useGetUnreadCountQuery(undefined, {
@@ -78,7 +78,8 @@ const Sidebar = () => {
   const getProfileRedirect = (): string => {
     switch (role) {
       case "organizer":
-        return "/profile/organizer";
+      case "organiser":
+        return "/profile/organiser";
       case "speaker":
         return "/profile/speaker";
       case "participant":

@@ -37,14 +37,15 @@ export default function ProfileLayout({
     window.scrollTo(0, 0);
   }, [pathname]);
 
-  // Check if this is a trainer profile route - if so, don't render UnifiedHeader/Sidebar
-  // The trainer layout will handle its own header and sidebar
-  const isTrainerRoute =
+  // Check if this is a trainer/speaker/organiser profile route - if so, don't render UnifiedHeader/Sidebar
+  // These layouts will handle their own header and sidebar
+  const isCustomLayoutRoute =
     pathname?.startsWith("/profile/trainer") ||
-    pathname?.startsWith("/profile/speaker");
+    pathname?.startsWith("/profile/speaker") ||
+    pathname?.startsWith("/profile/organiser");
 
-  // If it's a trainer route, just render children (trainer layout will handle everything)
-  if (isTrainerRoute) {
+  // If it's a custom layout route, just render children (their layout will handle everything)
+  if (isCustomLayoutRoute) {
     return <>{children}</>;
   }
 

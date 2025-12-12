@@ -7,8 +7,9 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";
 import { getProfileImageUrl, getUserInitials } from "@/utils/profileImage";
-import EditProfileModal from "../../modals/EditProfileModal";
-import ProfileImageModal from "../../modals/ProfileImageModal";
+// Import modals - for now using speaker modals, can be updated for organizer-specific modals later
+import EditProfileModal from "../../../speaker/components/modals/EditProfileModal";
+import ProfileImageModal from "../../../speaker/components/modals/ProfileImageModal";
 
 interface HeaderSectionProps {
   name: string;
@@ -211,8 +212,6 @@ const HeaderSection = ({
         onClose={() => setIsEditProfileOpen(false)}
         onSave={async () => {
           setIsEditProfileOpen(false);
-          // The modal already updates Redux state via updateProfileBio thunk
-          // No need to reload - state will update automatically
         }}
       />
 
@@ -222,7 +221,6 @@ const HeaderSection = ({
         onClose={() => setIsImageModalOpen(false)}
         onSave={async () => {
           setIsImageModalOpen(false);
-          // Force a small delay to ensure Redux state is updated before component re-renders
           await new Promise((resolve) => setTimeout(resolve, 100));
         }}
         currentImageUrl={profileImageUrl}

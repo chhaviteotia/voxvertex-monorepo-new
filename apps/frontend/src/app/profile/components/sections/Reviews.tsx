@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { Star, MessageSquare } from "lucide-react";
-import SectionHeader from "../../../components/common/SectionHeader";
+import SectionHeader from "../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchProfile, selectProfile } from "@/store/slices/profileSlice";
 

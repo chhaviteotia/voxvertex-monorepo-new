@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { MdWork } from "react-icons/md";
-import SectionHeader from "../../../components/common/SectionHeader";
+import SectionHeader from "../../components/common/SectionHeader";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   fetchProfile,
   removeWorkExperience,
   selectProfile,
 } from "@/store/slices/profileSlice";
-import AddWorkExperienceModal from "../modals/AddWorkExperienceModal";
+import AddWorkExperienceModal from "../../speaker/components/modals/AddWorkExperienceModal";
 
 /**
  * WorkExperience Component - Using Redux
