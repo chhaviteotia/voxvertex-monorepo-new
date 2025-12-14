@@ -22,6 +22,10 @@ export const authenticateUser = async (req, res, next) => {
     // Remove 'Bearer ' prefix if present
     if (token) {
       token = token.replace(/^Bearer\s+/i, '').trim();
+      // If token is the string "null" or "undefined", treat it as no token
+      if (token === 'null' || token === 'undefined' || token === '') {
+        token = null;
+      }
     }
     
     // If no header token, try cookies - check all possible user types

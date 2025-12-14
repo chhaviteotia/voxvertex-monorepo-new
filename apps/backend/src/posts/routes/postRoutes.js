@@ -30,6 +30,14 @@ const router = express.Router();
 router.get("/stats", authenticateUser, getUserPostStatsController);
 
 /**
+ * @route   GET /api/posts/my-posts
+ * @desc    Get all posts for current user (alias for /)
+ * @access  Private
+ * @query   status, type, page, limit, search
+ */
+router.get("/my-posts", authenticateUser, getUserPostsController);
+
+/**
  * @route   GET /api/posts
  * @desc    Get all posts for current user (with filters)
  * @access  Private

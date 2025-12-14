@@ -86,14 +86,24 @@ export const postsApi = baseApi.injectEndpoints({
         url: '/post/my-posts',
       }),
       providesTags: ['Post'],
-      transformResponse: (response: Post[] | ApiResponse<Post[]>) => {
-        // Handle both array response and ApiResponse format
+      transformResponse: (response: any) => {
+        // Handle different response formats
+        // 1. Direct array
         if (Array.isArray(response)) {
           return response;
         }
+        // 2. ApiResponse with data.posts (backend format)
         if (response.success && response.data) {
-          return response.data;
+          // Backend returns { success: true, data: { posts: [...], pagination: {...} } }
+          if (response.data.posts && Array.isArray(response.data.posts)) {
+            return response.data.posts;
+          }
+          // Or data is directly an array
+          if (Array.isArray(response.data)) {
+            return response.data;
+          }
         }
+        // 3. Fallback to empty array
         return [];
       },
     }),

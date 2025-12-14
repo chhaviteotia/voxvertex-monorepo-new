@@ -17,6 +17,20 @@ const profileSchema = new mongoose.Schema(
       index: true,
     },
     
+    // User name fields (synced from User model for easy access)
+    fullName: {
+      type: String,
+      trim: true,
+    },
+    firstName: {
+      type: String,
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      trim: true,
+    },
+    
     // Basic profile information
     professionalTitle: {
       type: String,
@@ -332,6 +346,125 @@ const profileSchema = new mongoose.Schema(
         },
       },
     ],
+    
+    // Awards and certifications array (separate from certifications for profile display)
+    awards: [
+      {
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        issuer: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        date: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        description: {
+          type: String,
+          trim: true,
+        },
+        category: {
+          type: String,
+          trim: true,
+        },
+        url: {
+          type: String,
+          trim: true,
+        },
+      },
+    ],
+    
+    // Featured videos array
+    featuredVideos: [
+      {
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        platform: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        videoUrl: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        thumbnail: {
+          type: String,
+          trim: true,
+        },
+        description: {
+          type: String,
+          trim: true,
+        },
+        duration: {
+          type: String,
+          trim: true,
+        },
+        tags: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
+      },
+    ],
+    
+    // Reviews array (stored in profile for quick access)
+    reviews: [
+      {
+        reviewerName: {
+          type: String,
+          trim: true,
+        },
+        rating: {
+          type: Number,
+          required: true,
+          min: 1,
+          max: 5,
+        },
+        remarks: {
+          type: String,
+          trim: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+        eventId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Event",
+        },
+        reviewType: {
+          type: String,
+          enum: ['event', 'collaboration', 'general'],
+          default: 'general',
+        },
+      },
+    ],
+    
+    // Ratings summary (calculated from reviews)
+    ratings: {
+      overall: {
+        average: {
+          type: Number,
+          default: 0,
+        },
+        count: {
+          type: Number,
+          default: 0,
+        },
+      },
+    },
   },
   {
     timestamps: true,

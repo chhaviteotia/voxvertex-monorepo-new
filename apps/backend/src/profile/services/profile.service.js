@@ -17,12 +17,43 @@ export const getOrCreateProfile = async (userId) => {
     let profile = await Profile.findOne({ user: userId });
     
     if (!profile) {
-      // Create a new profile
-      profile = new Profile({ user: userId });
+      // Get user data to sync name fields
+      const user = await User.findById(userId);
+      
+      // Create a new profile with user name fields
+      profile = new Profile({ 
+        user: userId,
+        fullName: user?.fullName || null,
+        firstName: user?.firstName || null,
+        lastName: user?.lastName || null,
+      });
       await profile.save();
       
       // Update user to reference the profile
       await User.findByIdAndUpdate(userId, { profile: profile._id });
+    } else {
+      // Sync name fields from User model if they're missing or outdated
+      const user = await User.findById(userId);
+      if (user) {
+        let needsUpdate = false;
+        
+        if (profile.fullName !== user.fullName) {
+          profile.fullName = user.fullName;
+          needsUpdate = true;
+        }
+        if (profile.firstName !== user.firstName) {
+          profile.firstName = user.firstName;
+          needsUpdate = true;
+        }
+        if (profile.lastName !== user.lastName) {
+          profile.lastName = user.lastName;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          await profile.save();
+        }
+      }
     }
     
     return profile;
@@ -47,16 +78,22 @@ export const updateUserProfile = async (email, updateData) => {
     // Get or create profile
     const profile = await getOrCreateProfile(user._id);
 
+    // Sync name fields from User to Profile (always keep them in sync)
+    profile.fullName = user.fullName || null;
+    profile.firstName = user.firstName || null;
+    profile.lastName = user.lastName || null;
+
     // Separate profile fields from user fields
     const profileFields = [
       'professionalTitle', 'yearsOfExperience', 'timeZone', 'bio',
       'website', 'linkedin', 'twitter', 'experience', 'education',
       'certifications', 'trainingCategories', 'languages',
       'industriesServed', 'clientTypesServed', 'workPreferences',
-      'skillsAssessment', 'trainingCalendar', 'profileImageUrl'
+      'skillsAssessment', 'trainingCalendar', 'profileImageUrl',
+      'awards', 'featuredVideos', 'reviews', 'ratings', 'areaOfExpertise'
     ];
 
-    const userFields = ['city', 'country', 'industry'];
+    const userFields = ['city', 'country', 'industry', 'fullName', 'firstName', 'lastName'];
 
     // Update profile fields
     profileFields.forEach(field => {
@@ -65,12 +102,17 @@ export const updateUserProfile = async (email, updateData) => {
       }
     });
 
-    // Update user fields (city, country, industry stay in User model)
+    // Update user fields (city, country, industry, name fields stay in User model)
     userFields.forEach(field => {
       if (updateData[field] !== undefined) {
         user[field] = updateData[field];
       }
     });
+
+    // Sync name fields again after potential user update
+    profile.fullName = user.fullName || null;
+    profile.firstName = user.firstName || null;
+    profile.lastName = user.lastName || null;
 
     // Special handling for workPreferences (object merge)
     if (updateData.workPreferences !== undefined) {

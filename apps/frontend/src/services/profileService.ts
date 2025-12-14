@@ -79,7 +79,8 @@ export interface ProfileResponse {
 }
 
 /**
- * Get current user's profile
+ * Get current user's profile (LEGACY - works for all user types)
+ * @deprecated Use role-specific functions: getSpeakerProfile, getTrainerProfile, getOrganiserProfile
  */
 export const getProfile = async (): Promise<ProfileResponse> => {
   try {
@@ -108,31 +109,138 @@ export const getProfile = async (): Promise<ProfileResponse> => {
 };
 
 /**
+ * Get Speaker Profile
+ * GET /api/profile/speaker
+ * SPEAKER ONLY
+ */
+export const getSpeakerProfile = async (): Promise<ProfileResponse> => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    
+    const response = await fetch(`${API_BASE_URL}/profile/speaker`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to get speaker profile');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Get speaker profile error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get Trainer Profile
+ * GET /api/profile/trainer
+ * TRAINER ONLY
+ */
+export const getTrainerProfile = async (): Promise<ProfileResponse> => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    
+    const response = await fetch(`${API_BASE_URL}/profile/trainer`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to get trainer profile');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Get trainer profile error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get Organiser Profile
+ * GET /api/profile/organiser
+ * ORGANISER ONLY
+ */
+export const getOrganiserProfile = async (): Promise<ProfileResponse> => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    
+    const response = await fetch(`${API_BASE_URL}/profile/organiser`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to get organiser profile');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Get organiser profile error:', error);
+    throw error;
+  }
+};
+
+/**
  * Add work experience
  */
 export const addExperience = async (data: ExperienceData): Promise<ProfileResponse> => {
   try {
     const token = localStorage.getItem('accessToken');
     
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    console.log('🔵 addExperience - Calling API:', `${API_BASE_URL}/profile/experience`);
+    console.log('🔵 Experience data:', data);
+    
     const response = await fetch(`${API_BASE_URL}/profile/experience`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
       body: JSON.stringify(data),
     });
+
+    console.log('🔵 addExperience - Response status:', response.status);
 
     const result = await response.json();
 
     if (!response.ok) {
+      console.error('❌ addExperience - API Error:', result);
       throw new Error(result.message || 'Failed to add experience');
     }
 
+    console.log('✅ addExperience - Success');
     return result;
   } catch (error) {
-    console.error('Add experience error:', error);
+    console.error('❌ Add experience error:', error);
     throw error;
   }
 };
@@ -147,25 +255,36 @@ export const updateExperience = async (
   try {
     const token = localStorage.getItem('accessToken');
     
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    console.log('🔵 updateExperience - Calling API:', `${API_BASE_URL}/profile/experience/${experienceId}`);
+    
     const response = await fetch(`${API_BASE_URL}/profile/experience/${experienceId}`, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
       body: JSON.stringify(data),
     });
 
     const result = await response.json();
 
     if (!response.ok) {
+      console.error('❌ updateExperience - API Error:', result);
       throw new Error(result.message || 'Failed to update experience');
     }
 
+    console.log('✅ updateExperience - Success');
     return result;
   } catch (error) {
-    console.error('Update experience error:', error);
+    console.error('❌ Update experience error:', error);
     throw error;
   }
 };
@@ -177,24 +296,35 @@ export const deleteExperience = async (experienceId: string): Promise<ProfileRes
   try {
     const token = localStorage.getItem('accessToken');
     
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    console.log('🔵 deleteExperience - Calling API:', `${API_BASE_URL}/profile/experience/${experienceId}`);
+    
     const response = await fetch(`${API_BASE_URL}/profile/experience/${experienceId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
     });
 
     const result = await response.json();
 
     if (!response.ok) {
+      console.error('❌ deleteExperience - API Error:', result);
       throw new Error(result.message || 'Failed to delete experience');
     }
 
+    console.log('✅ deleteExperience - Success');
     return result;
   } catch (error) {
-    console.error('Delete experience error:', error);
+    console.error('❌ Delete experience error:', error);
     throw error;
   }
 };
@@ -206,25 +336,39 @@ export const addEducation = async (data: EducationData): Promise<ProfileResponse
   try {
     const token = localStorage.getItem('accessToken');
     
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    console.log('🔵 addEducation - Calling API:', `${API_BASE_URL}/profile/education`);
+    console.log('🔵 Education data:', data);
+    
     const response = await fetch(`${API_BASE_URL}/profile/education`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
       body: JSON.stringify(data),
     });
+
+    console.log('🔵 addEducation - Response status:', response.status);
 
     const result = await response.json();
 
     if (!response.ok) {
+      console.error('❌ addEducation - API Error:', result);
       throw new Error(result.message || 'Failed to add education');
     }
 
+    console.log('✅ addEducation - Success');
     return result;
   } catch (error) {
-    console.error('Add education error:', error);
+    console.error('❌ Add education error:', error);
     throw error;
   }
 };
@@ -239,25 +383,36 @@ export const updateEducation = async (
   try {
     const token = localStorage.getItem('accessToken');
     
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    console.log('🔵 updateEducation - Calling API:', `${API_BASE_URL}/profile/education/${educationId}`);
+    
     const response = await fetch(`${API_BASE_URL}/profile/education/${educationId}`, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
       body: JSON.stringify(data),
     });
 
     const result = await response.json();
 
     if (!response.ok) {
+      console.error('❌ updateEducation - API Error:', result);
       throw new Error(result.message || 'Failed to update education');
     }
 
+    console.log('✅ updateEducation - Success');
     return result;
   } catch (error) {
-    console.error('Update education error:', error);
+    console.error('❌ Update education error:', error);
     throw error;
   }
 };
@@ -269,24 +424,35 @@ export const deleteEducation = async (educationId: string): Promise<ProfileRespo
   try {
     const token = localStorage.getItem('accessToken');
     
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    console.log('🔵 deleteEducation - Calling API:', `${API_BASE_URL}/profile/education/${educationId}`);
+    
     const response = await fetch(`${API_BASE_URL}/profile/education/${educationId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
     });
 
     const result = await response.json();
 
     if (!response.ok) {
+      console.error('❌ deleteEducation - API Error:', result);
       throw new Error(result.message || 'Failed to delete education');
     }
 
+    console.log('✅ deleteEducation - Success');
     return result;
   } catch (error) {
-    console.error('Delete education error:', error);
+    console.error('❌ Delete education error:', error);
     throw error;
   }
 };
@@ -476,7 +642,8 @@ export const deleteVideo = async (videoId: string): Promise<ProfileResponse> => 
 };
 
 /**
- * Update profile bio
+ * Update profile bio (LEGACY - for organiser/participant)
+ * @deprecated Use role-specific functions: updateSpeakerBio, updateOrganiserBio
  */
 export const updateBio = async (bio: string): Promise<ProfileResponse> => {
   try {
@@ -501,6 +668,105 @@ export const updateBio = async (bio: string): Promise<ProfileResponse> => {
     return result;
   } catch (error) {
     console.error('Update bio error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update Speaker Bio
+ * PUT /api/profile/speaker/bio
+ * SPEAKER ONLY
+ */
+export const updateSpeakerBio = async (bio: string): Promise<ProfileResponse> => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    
+    const response = await fetch(`${API_BASE_URL}/profile/speaker/bio`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ bio }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to update speaker bio');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Update speaker bio error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update Organiser Bio
+ * PUT /api/profile/organiser/bio
+ * ORGANISER ONLY
+ */
+export const updateOrganiserBio = async (bio: string): Promise<ProfileResponse> => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    
+    console.log('🔵 updateOrganiserBio - Calling API:', `${API_BASE_URL}/profile/organiser/bio`);
+    console.log('🔵 Bio data:', bio?.substring(0, 50) + '...');
+    console.log('🔵 Token exists:', !!token);
+    console.log('🔵 Token value:', token ? 'Present' : 'Missing');
+    
+    // Prepare headers - only include Authorization if token exists and is valid
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Bearer token if it exists and is not null/undefined
+    // Backend will fall back to cookies if no Bearer token is provided
+    if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('🔵 Using Bearer token authentication');
+    } else {
+      console.log('🔵 No Bearer token, relying on cookie-based authentication');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/profile/organiser/bio`, {
+      method: 'PUT',
+      headers,
+      credentials: 'include', // Important: sends cookies for authentication
+      body: JSON.stringify({ bio }),
+    });
+
+    console.log('🔵 Response status:', response.status);
+    console.log('🔵 Response ok:', response.ok);
+
+    const result = await response.json();
+    console.log('🔵 Response result:', result);
+
+    if (!response.ok) {
+      const errorMessage = result.message || result.error || 'Failed to update organiser bio';
+      console.error('❌ API Error:', errorMessage);
+      console.error('❌ Full response:', result);
+      console.error('❌ Status code:', response.status);
+      
+      // If 401, provide more helpful error message
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please try logging in again.');
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    console.log('✅ Bio updated successfully');
+    return result;
+  } catch (error) {
+    console.error('❌ Update organiser bio error:', error);
+    if (error instanceof Error) {
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+    }
     throw error;
   }
 };

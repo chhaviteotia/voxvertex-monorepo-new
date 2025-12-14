@@ -1,6 +1,9 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import type { RootState } from "../index";
 import {
   getProfile,
+  getSpeakerProfile,
+  getOrganiserProfile,
   addExperience,
   updateExperience,
   deleteExperience,
@@ -15,6 +18,8 @@ import {
   deleteVideo,
   updateSkills,
   updateBio,
+  updateSpeakerBio,
+  updateOrganiserBio,
   type ExperienceData,
   type EducationData,
   type AwardData,
@@ -22,6 +27,14 @@ import {
   type SkillData,
   type ProfileResponse,
 } from "@/services/profileService";
+
+// Helper to get current pathname (for route-based role detection)
+const getCurrentPathname = (): string => {
+  if (typeof window !== "undefined") {
+    return window.location.pathname;
+  }
+  return "";
+};
 
 /**
  * Profile State Interface
@@ -44,14 +57,51 @@ const initialState: ProfileState = {
  * Async Thunks for Profile Operations
  */
 
-// Fetch profile
+/**
+ * Fetch profile - Automatically uses role-specific endpoint based on user role
+ * Uses: /api/profile/speaker for speakers, /api/profile/organiser for organisers, /api/profile/me for others
+ */
 export const fetchProfile = createAsyncThunk<
   ProfileResponse,
   void,
-  { rejectValue: string }
->("profile/fetchProfile", async (_, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("profile/fetchProfile", async (_, { rejectWithValue, getState }) => {
   try {
-    const response = await getProfile();
+    // Get user from auth state
+    const authUser = getState().auth.user;
+    const userRole = authUser?.role;
+    const userId = authUser?._id || authUser?.id;
+    
+    // Get current profile data
+    const currentProfileData = getState().profile.data;
+    const currentProfileUserId = currentProfileData?._id || currentProfileData?.id;
+    
+    // If profile data exists but belongs to a different user, we should clear it first
+    // This check is handled by the component, but we log it here for debugging
+    if (userId && currentProfileUserId && currentProfileUserId !== userId) {
+      console.log("⚠️ Profile data belongs to different user, will be replaced");
+    }
+    
+    console.log("🔵 fetchProfile - Fetching profile for user:", userId, "role:", userRole);
+    
+    // Use role-specific endpoints
+    let response: ProfileResponse;
+    if (userRole === "speaker") {
+      response = await getSpeakerProfile();
+    } else if (userRole === "organiser" || userRole === "organizer") {
+      response = await getOrganiserProfile();
+    } else {
+      // Fallback to legacy endpoint for other roles or if role is unknown
+      response = await getProfile();
+    }
+    
+    // Verify the response belongs to the current user
+    const responseUserId = response?.data?._id || response?.data?.id;
+    if (userId && responseUserId && responseUserId !== userId) {
+      console.error("❌ Profile response belongs to different user!");
+      throw new Error("Profile data mismatch - received data for different user");
+    }
+    
     return response;
   } catch (error) {
     const message =
@@ -302,16 +352,91 @@ export const updateProfileSkills = createAsyncThunk<
   }
 });
 
-// Update bio
+/**
+ * Update bio - Automatically uses role-specific endpoint based on user role
+ * Uses: /api/profile/speaker/bio for speakers, /api/profile/organiser/bio for organisers
+ */
 export const updateProfileBio = createAsyncThunk<
   ProfileResponse,
   string,
-  { rejectValue: string }
->("profile/updateBio", async (bio, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("profile/updateBio", async (bio, { rejectWithValue, getState }) => {
   try {
-    const response = await updateBio(bio);
+    // Get user role from multiple sources (auth state, profile data, current route)
+    const authUser = getState().auth.user;
+    const profileData = getState().profile.data;
+    const currentPath = getCurrentPathname();
+    
+    // Try to get role from multiple sources
+    let userRole = 
+      authUser?.role || 
+      (authUser as any)?.userRole ||
+      profileData?.role ||
+      profileData?.user?.role;
+    
+    // Priority: Check current route first (most reliable for profile pages)
+    // This ensures we use the correct endpoint based on which profile page the user is on
+    if (currentPath) {
+      if (currentPath.includes("/profile/organiser")) {
+        userRole = "organiser";
+        console.log("📍 Detected organiser from route path");
+      } else if (currentPath.includes("/profile/speaker")) {
+        userRole = "speaker";
+        console.log("📍 Detected speaker from route path");
+      } else if (currentPath.includes("/profile/trainer")) {
+        userRole = "trainer";
+        console.log("📍 Detected trainer from route path");
+      }
+    }
+    
+    // If role not found from route, try to infer from auth/profile data
+    if (!userRole) {
+      if (authUser?.role) {
+        userRole = authUser.role;
+        console.log("📍 Detected role from auth user:", userRole);
+      } else if (profileData?.role) {
+        userRole = profileData.role;
+        console.log("📍 Detected role from profile data:", userRole);
+      }
+    }
+    
+    // Normalize role (handle both spellings and case)
+    const normalizedRole = userRole?.toLowerCase()?.trim();
+    
+    console.log("🔍 updateProfileBio - Final user role:", userRole, "Normalized:", normalizedRole);
+    console.log("🔍 Current path:", currentPath);
+    console.log("🔍 Auth user:", authUser);
+    console.log("🔍 Profile data:", profileData);
+    
+    // Use role-specific endpoints
+    let response: ProfileResponse;
+    if (normalizedRole === "speaker") {
+      console.log("📝 Using speaker bio endpoint");
+      response = await updateSpeakerBio(bio);
+    } else if (normalizedRole === "organiser" || normalizedRole === "organizer") {
+      console.log("📝 Using organiser bio endpoint");
+      response = await updateOrganiserBio(bio);
+    } else {
+      // Fallback to legacy endpoint - but log warning
+      console.warn("⚠️ Role not detected, using legacy endpoint. Role was:", userRole);
+      console.warn("⚠️ Trying legacy endpoint /api/profile/bio");
+      // If we're on organiser page but role not detected, still try organiser endpoint
+      if (currentPath?.includes("/profile/organiser")) {
+        console.log("⚠️ On organiser page but role not detected, trying organiser endpoint anyway");
+        try {
+          response = await updateOrganiserBio(bio);
+        } catch (error) {
+          console.warn("⚠️ Organiser endpoint failed, falling back to legacy");
+          response = await updateBio(bio);
+        }
+      } else {
+        response = await updateBio(bio);
+      }
+    }
+    
     return response;
   } catch (error) {
+    console.error("❌ updateProfileBio error:", error);
     const message =
       error instanceof Error
         ? error.message

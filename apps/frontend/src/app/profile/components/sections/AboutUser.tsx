@@ -5,6 +5,8 @@ import { BsGraphUpArrow } from "react-icons/bs";
 import { FiPhone, FiMail, FiMapPin } from "react-icons/fi";
 import { useAuth } from "@/store/hooks";
 import { useGetCurrentUserQuery } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchProfile, selectProfileData, resetProfile } from "@/store/slices/profileSlice";
 import dynamic from "next/dynamic";
 import HeaderSection from "./aboutUser/HeaderSection";
 import InfoCard from "../../components/common/InfoCard";
@@ -38,9 +40,22 @@ const EventIcon = ({ className }: { className?: string }) => (
  */
 const AboutUser = memo(() => {
   const auth = useAuth();
+  const dispatch = useAppDispatch();
   const [isLoading, setIsLoading] = useState(true);
   const { data: currentUserData, isLoading: isUserLoading } =
     useGetCurrentUserQuery();
+  
+  // Get profile data and status from profile slice
+  const profileData = useAppSelector(selectProfileData);
+  const profileStatus = useAppSelector((state) => state.profile.status);
+  const profileError = useAppSelector((state) => state.profile.error);
+  
+  console.log("🔵 AboutUser - Profile state:", {
+    hasProfileData: !!profileData,
+    profileStatus,
+    profileError,
+    profileDataName: profileData?.fullName || profileData?.firstName,
+  });
 
   // Default fallback data
   const defaultData = {
@@ -68,21 +83,87 @@ const AboutUser = memo(() => {
   // Track last processed user ID to prevent unnecessary re-processing
   const lastProcessedUserIdRef = useRef<string | null>(null);
 
+  // Get current user ID from auth state
+  const currentUserId = auth.user?._id || auth.user?.id || currentUserData?.user?._id || currentUserData?.user?.id;
+
+  // Reset profile data if user changes
   useEffect(() => {
-    const user = currentUserData?.user || auth.user;
+    if (currentUserId && lastProcessedUserIdRef.current && lastProcessedUserIdRef.current !== currentUserId) {
+      console.log("🔄 AboutUser - User changed, resetting profile data");
+      dispatch(resetProfile());
+      lastProcessedUserIdRef.current = null;
+    }
+  }, [currentUserId, dispatch]);
+
+  // Fetch profile data on mount if not already loaded, or if user changed
+  useEffect(() => {
+    // Check if profile data belongs to current user
+    const profileUserId = profileData?._id || profileData?.id;
+    const shouldFetch = 
+      (profileStatus === "idle" || profileStatus === "failed") ||
+      (currentUserId && profileUserId && profileUserId !== currentUserId);
+    
+    if (shouldFetch) {
+      console.log("🔵 AboutUser - Fetching profile data for user:", currentUserId);
+      dispatch(fetchProfile());
+    }
+  }, [dispatch, profileStatus, currentUserId, profileData?._id]);
+
+  useEffect(() => {
+    // Prioritize profile data (from profile slice) over auth user data
+    // Profile data has complete information from role-specific endpoints
+    const profileUserId = profileData?._id || profileData?.id;
+    
+    // CRITICAL: If profile data belongs to a different user, don't use it
+    if (profileData && currentUserId && profileUserId && profileUserId !== currentUserId) {
+      console.error("❌ AboutUser - Profile data belongs to different user! Clearing...");
+      dispatch(resetProfile());
+      setIsLoading(true);
+      return;
+    }
+    
+    const user = profileData || currentUserData?.user || auth.user;
     const userId = user?._id || user?.id || null;
 
-    // If no user ID, use default data but don't keep loading
-    if (!userId) {
-      setUserData(defaultData);
-      setIsLoading(false);
+    console.log("🔵 AboutUser - Processing user data:", {
+      hasProfileData: !!profileData,
+      hasCurrentUserData: !!currentUserData?.user,
+      hasAuthUser: !!auth.user,
+      userId,
+      currentUserId,
+      profileUserId,
+      profileStatus,
+    });
+
+    // If profile is still loading, wait for it (don't show default data yet)
+    if (profileStatus === "loading" && !profileData) {
+      console.log("🔵 AboutUser - Profile still loading, waiting...");
+      setIsLoading(true);
       return;
     }
 
-    // Skip if this is the same user we just processed
-    if (lastProcessedUserIdRef.current === userId) {
-      setIsLoading(false);
+    // If no user ID after loading is complete, use default data
+    if (!userId) {
+      console.log("🔵 AboutUser - No user ID found, using default data");
+      // Only set default if we're not still loading
+      if (profileStatus !== "loading") {
+        setUserData(defaultData);
+        setIsLoading(false);
+      }
       return;
+    }
+
+    // Skip if this is the same user we just processed AND we already have profile data
+    // But always update if profile data is now available (even if same user)
+    if (lastProcessedUserIdRef.current === userId && lastProcessedUserIdRef.current !== null) {
+      // If we have profile data now, continue to update (profile might have changed)
+      if (profileData) {
+        // Continue to process and update
+      } else {
+        // Same user, no profile data yet - skip processing
+        setIsLoading(false);
+        return;
+      }
     }
 
     // Extract domains/expertise from user data
@@ -92,6 +173,7 @@ const AboutUser = memo(() => {
       defaultData.domains;
 
     // Prepare user data - prioritize firstName + lastName, then fullName, then default
+    // Check profile data first, then auth user data
     let userName = defaultData.name;
     const firstName = (user as any).firstName || "";
     const lastName = (user as any).lastName || "";
@@ -103,6 +185,7 @@ const AboutUser = memo(() => {
       lastName,
       fullName,
       user: user,
+      profileData: profileData,
     });
 
     if (firstName && lastName) {
@@ -153,10 +236,16 @@ const AboutUser = memo(() => {
     lastProcessedUserIdRef.current = userId;
     setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserData?.user?._id, auth.user?._id]);
+  }, [profileData, profileStatus, currentUserData?.user?._id, auth.user?._id, currentUserId]);
 
-  // Show loading state only if we're actually loading and don't have user data yet
-  if ((isLoading || isUserLoading) && !currentUserData?.user && !auth.user) {
+  // Show loading state if we're loading profile or user data
+  const isActuallyLoading = 
+    (isLoading || isUserLoading || profileStatus === "loading") && 
+    !profileData && 
+    !currentUserData?.user && 
+    !auth.user;
+  
+  if (isActuallyLoading) {
     return (
       <div className="w-full h-auto bg-[#FFFDFB] shadow-md rounded-lg p-4 animate-pulse">
         <div className="h-40 bg-gray-200 rounded mb-4"></div>

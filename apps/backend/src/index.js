@@ -9,6 +9,7 @@ import profileRoutes from './profile/routes/profileRoutes.js';
 import postRoutes from './posts/routes/postRoutes.js';
 import messageRoutes from './messages/routes/conversationRoutes.js';
 import marketplaceRoutes from './marketplace/routes/marketplaceRoutes.js';
+import availabilityRoutes from './availability/routes/availabilityRoutes.js';
 import connectDB from './configs/dbConnect.js';
 import { connectCloudinary } from './configs/cloudinary.config.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
@@ -63,6 +64,8 @@ app.use('/api/profile', profileRoutes);
 // Post routes
 // Routes: /api/posts/*
 app.use('/api/posts', postRoutes);
+// Also support /api/post/* for backward compatibility
+app.use('/api/post', postRoutes);
 
 // Message routes
 // Routes: /api/messages/*
@@ -71,6 +74,10 @@ app.use('/api/messages', messageRoutes);
 // Marketplace routes
 // Routes: /api/marketplace/*
 app.use('/api/marketplace', marketplaceRoutes);
+
+// Availability routes
+// Routes: /api/availability/*
+app.use('/api/availability', availabilityRoutes);
 
 // 404 handler (must be before error handler)
 app.use(notFoundHandler);
