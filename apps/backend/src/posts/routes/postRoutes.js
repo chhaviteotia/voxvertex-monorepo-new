@@ -2,6 +2,7 @@ import express from "express";
 import {
   createPostController,
   getUserPostsController,
+  getAllPostsController,
   getPostByIdController,
   updatePostController,
   deletePostController,
@@ -28,6 +29,14 @@ const router = express.Router();
  * @access  Private
  */
 router.get("/stats", authenticateUser, getUserPostStatsController);
+
+/**
+ * @route   GET /api/posts/community
+ * @desc    Get all published posts from all users (for community page)
+ * @access  Public (or Private if you want authentication)
+ * @query   type, page, limit, search, sortBy
+ */
+router.get("/community", getAllPostsController);
 
 /**
  * @route   GET /api/posts/my-posts

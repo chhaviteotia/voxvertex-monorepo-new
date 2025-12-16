@@ -32,7 +32,7 @@ export default function HeroSection() {
             {/* CTA Buttons */}
             <div className="flex flex-wrap gap-4 mb-8">
               <Link
-                href="/marketplace"
+                href="/signup/organiser"
                 className="rounded-lg bg-white px-6 py-3 text-base font-medium text-teal-600 transition-colors hover:bg-gray-50 flex items-center gap-2"
               >
                 Find Experts

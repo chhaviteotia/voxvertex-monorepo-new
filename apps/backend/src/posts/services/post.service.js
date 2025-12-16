@@ -223,6 +223,156 @@ export const getUserPosts = async (userId, options = {}) => {
 };
 
 /**
+ * Get all published posts from all users (for community page)
+ * @param {Object} options - Query options
+ * @param {string} options.type - Filter by post type
+ * @param {number} options.page - Page number
+ * @param {number} options.limit - Items per page
+ * @param {string} options.search - Search term
+ * @param {string} options.sortBy - Sort order: recent, oldest, mostLiked, mostViewed, mostEngaged
+ * @returns {Promise<Object>} Posts and pagination info
+ */
+export const getAllPosts = async (options = {}) => {
+  const {
+    type,
+    page = 1,
+    limit = 20,
+    search,
+    sortBy = "recent",
+  } = options;
+
+  const query = {
+    status: "published",
+    isDeleted: false,
+  };
+
+  if (type) {
+    query.type = type;
+  }
+
+  if (search) {
+    query.$or = [
+      { content: { $regex: search, $options: "i" } },
+      { hashtags: { $in: [new RegExp(search, "i")] } },
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  // Determine sort order based on sortBy parameter
+  let sortOrder = { createdAt: -1 }; // Default: newest first
+
+  switch (sortBy) {
+    case "recent":
+      sortOrder = { createdAt: -1 }; // Newest first
+      break;
+    case "oldest":
+      sortOrder = { createdAt: 1 }; // Oldest first
+      break;
+    case "mostLiked":
+      sortOrder = { "metrics.likes": -1 }; // Most likes first
+      break;
+    case "mostViewed":
+      sortOrder = { "metrics.views": -1 }; // Most views first
+      break;
+    case "mostEngaged":
+      // For engagement, we need to sort by a calculated field
+      break;
+    default:
+      sortOrder = { createdAt: -1 }; // Default to newest first
+  }
+
+  let posts, total;
+
+  if (sortBy === "mostEngaged") {
+    // Use aggregation pipeline to calculate engagement and sort
+    const engagementPipeline = [
+      { $match: query },
+      {
+        $addFields: {
+          engagement: {
+            $add: [
+              "$metrics.likes",
+              "$metrics.comments",
+              "$metrics.shares",
+            ],
+          },
+        },
+      },
+      { $sort: { engagement: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      { $project: { _id: 1 } },
+    ];
+
+    const sortedPostIds = await Post.aggregate(engagementPipeline);
+    const postIds = sortedPostIds.map((p) => p._id);
+
+    // Now fetch posts in the correct order with population
+    if (postIds.length > 0) {
+      posts = await Post.find({ _id: { $in: postIds } })
+        .populate("author", "fullName firstName lastName email role professionalTitle verified")
+        .populate("comments.author", "fullName firstName lastName email")
+        .populate("likedBy", "fullName firstName lastName")
+        .lean();
+
+      // Sort posts to match the engagement order
+      const postMap = new Map(posts.map((post) => [post._id.toString(), post]));
+      posts = postIds.map((id) => postMap.get(id.toString())).filter(Boolean);
+      
+      // Normalize likedBy arrays to strings
+      posts = posts.map((post) => {
+        if (post.likedBy && Array.isArray(post.likedBy)) {
+          post.likedBy = post.likedBy.map((id) => 
+            id.toString ? id.toString() : String(id)
+          );
+        }
+        return post;
+      });
+    } else {
+      posts = [];
+    }
+
+    total = await Post.countDocuments(query);
+  } else {
+    // Standard query with sort
+    [posts, total] = await Promise.all([
+      Post.find(query)
+        .populate("author", "fullName firstName lastName email role professionalTitle verified")
+        .populate("comments.author", "fullName firstName lastName email")
+        .populate("likedBy", "fullName firstName lastName")
+        .sort(sortOrder)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Post.countDocuments(query),
+    ]);
+  }
+
+  // Normalize likedBy arrays to strings for all posts
+  if (posts && Array.isArray(posts)) {
+    posts = posts.map((post) => {
+      if (post.likedBy && Array.isArray(post.likedBy)) {
+        post.likedBy = post.likedBy.map((id) => 
+          id.toString ? id.toString() : String(id)
+        );
+      }
+      return post;
+    });
+  }
+
+  return {
+    posts,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  };
+};
+
+/**
  * Get a single post by ID
  * @param {string} postId - Post ID
  * @returns {Promise<Object>} Post

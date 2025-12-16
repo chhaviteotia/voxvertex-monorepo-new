@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useExpertAuth } from "@/store/hooks/expertAuth";
+import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -23,15 +23,19 @@ export default function ProtectedRoute({
   requiredRole,
 }: ProtectedRouteProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, user } = useExpertAuth();
+  const { isAuthenticated } = useAuth();
+  const { data: currentUserData, isLoading } = useGetCurrentUserQuery();
+  
+  const user = currentUserData?.user;
+  const isUserAuthenticated = isAuthenticated || !!user;
 
   useEffect(() => {
     // Only check if we're done loading
     if (isLoading) return;
 
     // Redirect to login if not authenticated
-    if (!isAuthenticated) {
-      router.push(redirectTo);
+    if (!isUserAuthenticated) {
+      router.replace(redirectTo);
       return;
     }
 
@@ -43,11 +47,11 @@ export default function ProtectedRoute({
         : [requiredRole];
 
       if (!allowedRoles.includes(userRole)) {
-        // Redirect to dashboard if role doesn't match
-        router.push("/dashboard");
+        // Redirect to home if role doesn't match
+        router.replace("/");
       }
     }
-  }, [isAuthenticated, isLoading, user, router, redirectTo, requiredRole]);
+  }, [isUserAuthenticated, isLoading, user, router, redirectTo, requiredRole]);
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -62,7 +66,7 @@ export default function ProtectedRoute({
   }
 
   // Don't render children if not authenticated (will redirect)
-  if (!isAuthenticated) {
+  if (!isUserAuthenticated) {
     return null;
   }
 

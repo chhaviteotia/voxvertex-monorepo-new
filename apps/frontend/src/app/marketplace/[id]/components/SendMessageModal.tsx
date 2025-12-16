@@ -14,7 +14,7 @@ interface SendMessageModalProps {
   isOpen: boolean;
   onClose: () => void;
   expert: Expert;
-  onSend: (message: string) => void;
+  onSend: (message: string) => Promise<void>;
 }
 
 export default function SendMessageModal({
@@ -27,11 +27,17 @@ export default function SendMessageModal({
 
   if (!isOpen) return null;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (message.trim()) {
-      onSend(message);
-      setMessage("Hi, I would like to discuss...");
-      onClose();
+      try {
+        await onSend(message);
+        // Only clear message and close if send was successful
+        // The parent component will handle closing the modal
+        setMessage("Hi, I would like to discuss...");
+      } catch (error) {
+        // Error handling is done in the parent component
+        console.error("Error sending message:", error);
+      }
     }
   };
 

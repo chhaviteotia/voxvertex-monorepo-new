@@ -102,22 +102,46 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
 };
 
 /**
- * Logout user
+ * Unified Logout - Works for all user types (trainer, speaker, organiser, participant)
+ * Clears all authentication cookies and localStorage
  */
 export const logout = async (): Promise<void> => {
   try {
+    // Call unified logout endpoint
     await fetch(`${API_BASE_URL}/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
-
-    // Clear localStorage
-    localStorage.removeItem('accessToken');
   } catch (error) {
-    console.error('Logout error:', error);
-    // Clear localStorage even if API call fails
-    localStorage.removeItem('accessToken');
+    console.error('Logout API error:', error);
+    // Continue even if API call fails
   }
+
+  // Clear all localStorage items
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('token');
+  
+  // Clear all possible cookies on client side (as backup)
+  // Note: We can't directly delete httpOnly cookies, but we can try to clear non-httpOnly ones
+  const cookiesToClear = [
+    'accessToken',
+    'refreshToken',
+    'token',
+    'userRole',
+    'expertAccessToken',
+    'expertRefreshToken',
+    'expertRole',
+  ];
+  
+  cookiesToClear.forEach(cookieName => {
+    // Clear cookie for current path
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    // Clear cookie for root domain
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+    // Clear cookie without domain (for localhost)
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;`;
+  });
 };
 
 /**
@@ -137,13 +161,19 @@ export const getCurrentUser = async (): Promise<any> => {
     const result = await response.json();
 
     if (!response.ok) {
+      // If 401, user is not authenticated - return null instead of throwing
+      if (response.status === 401) {
+        return null;
+      }
       throw new Error(result.message || 'Failed to get user');
     }
 
-    return result.user;
+    // Return user only if it exists
+    return result.user || null;
   } catch (error) {
     console.error('Get current user error:', error);
-    throw error;
+    // Return null instead of throwing to prevent breaking the app
+    return null;
   }
 };
 

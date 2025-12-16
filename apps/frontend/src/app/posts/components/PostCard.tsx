@@ -334,25 +334,36 @@ export default function PostCard({
   };
 
   const handleShare = async () => {
-    // Optimistic update
-    setLocalMetrics((prev) => ({
-      ...prev,
-      shares: prev.shares + 1,
-    }));
-
     try {
-      const result = await sharePost(post.id).unwrap();
-      // Update with server response if available
-      if (result.data?.post) {
-        setLocalMetrics(result.data.post.metrics);
-      }
-    } catch (error) {
-      console.error("Failed to share post:", error);
-      // Revert optimistic update on error
+      // Generate shareable link
+      const shareableLink = `${window.location.origin}/posts/${post.id}`;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(shareableLink);
+      
+      // Show success message
+      alert(`Post link copied to clipboard!\n${shareableLink}`);
+      
+      // Optimistic update
       setLocalMetrics((prev) => ({
         ...prev,
-        shares: Math.max(0, prev.shares - 1),
+        shares: prev.shares + 1,
       }));
+
+      // Call API to update share count
+      try {
+        const result = await sharePost(post.id).unwrap();
+        // Update with server response if available
+        if (result.data?.post) {
+          setLocalMetrics(result.data.post.metrics);
+        }
+      } catch (apiError) {
+        console.error("Failed to update share count:", apiError);
+        // Don't revert the optimistic update if clipboard copy succeeded
+      }
+    } catch (error) {
+      console.error("Failed to copy link:", error);
+      alert("Failed to copy link. Please try again.");
     }
   };
 

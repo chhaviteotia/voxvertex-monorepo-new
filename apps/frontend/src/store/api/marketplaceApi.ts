@@ -38,7 +38,21 @@ export interface GetExpertsResponse {
 export interface GetExpertsParams {
   search?: string;
   role?: "speaker" | "trainer";
+  roles?: string[];
   industry?: string;
+  industries?: string[];
+  expertise?: string[];
+  sessionTypes?: string[];
+  sessionFormats?: string[];
+  sessionDurations?: string[];
+  audienceTypes?: string[];
+  languages?: string[];
+  availability?: string[];
+  ratings?: string[];
+  experienceLevels?: string[];
+  verificationStatus?: string[];
+  priceMin?: number;
+  priceMax?: number;
   country?: string;
   city?: string;
   limit?: number;
@@ -88,7 +102,45 @@ export const marketplaceApi = baseApi.injectEndpoints({
         const queryParams = new URLSearchParams();
         if (params.search) queryParams.append("search", params.search);
         if (params.role) queryParams.append("role", params.role);
+        if (params.roles && params.roles.length > 0) {
+          params.roles.forEach((r) => queryParams.append("roles", r));
+        }
         if (params.industry) queryParams.append("industry", params.industry);
+        if (params.industries && params.industries.length > 0) {
+          params.industries.forEach((i) => queryParams.append("industries", i));
+        }
+        if (params.expertise && params.expertise.length > 0) {
+          params.expertise.forEach((e) => queryParams.append("expertise", e));
+        }
+        if (params.sessionTypes && params.sessionTypes.length > 0) {
+          params.sessionTypes.forEach((st) => queryParams.append("sessionTypes", st));
+        }
+        if (params.sessionFormats && params.sessionFormats.length > 0) {
+          params.sessionFormats.forEach((sf) => queryParams.append("sessionFormats", sf));
+        }
+        if (params.sessionDurations && params.sessionDurations.length > 0) {
+          params.sessionDurations.forEach((sd) => queryParams.append("sessionDurations", sd));
+        }
+        if (params.audienceTypes && params.audienceTypes.length > 0) {
+          params.audienceTypes.forEach((at) => queryParams.append("audienceTypes", at));
+        }
+        if (params.languages && params.languages.length > 0) {
+          params.languages.forEach((l) => queryParams.append("languages", l));
+        }
+        if (params.availability && params.availability.length > 0) {
+          params.availability.forEach((a) => queryParams.append("availability", a));
+        }
+        if (params.ratings && params.ratings.length > 0) {
+          params.ratings.forEach((r) => queryParams.append("ratings", r));
+        }
+        if (params.experienceLevels && params.experienceLevels.length > 0) {
+          params.experienceLevels.forEach((el) => queryParams.append("experienceLevels", el));
+        }
+        if (params.verificationStatus && params.verificationStatus.length > 0) {
+          params.verificationStatus.forEach((vs) => queryParams.append("verificationStatus", vs));
+        }
+        if (params.priceMin !== undefined) queryParams.append("priceMin", params.priceMin.toString());
+        if (params.priceMax !== undefined) queryParams.append("priceMax", params.priceMax.toString());
         if (params.country) queryParams.append("country", params.country);
         if (params.city) queryParams.append("city", params.city);
         if (params.limit) queryParams.append("limit", params.limit.toString());
@@ -106,7 +158,15 @@ export const marketplaceApi = baseApi.injectEndpoints({
         url: `/marketplace/experts/${id}`,
         method: "GET",
       }),
-      transformResponse: (response: GetExpertByIdResponse) => response,
+      transformResponse: (response: any) => {
+        // Backend returns { success: true, data: { expert: {...} }, message: "..." }
+        // Ensure we return the correct structure
+        if (response.success && response.data) {
+          return response;
+        }
+        // If response doesn't have expected structure, return as is
+        return response;
+      },
     }),
   }),
   overrideExisting: false,

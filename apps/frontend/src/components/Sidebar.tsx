@@ -99,8 +99,8 @@ export default function Sidebar() {
     {
       icon: Brain,
       label: "AI Tech Readiness",
-      href: "/readiness_testing/trainer",
-      active: currentPath.startsWith("/readiness_testing"),
+      href: "/tech-readiness",
+      active: currentPath.startsWith("/tech-readiness"),
     },
     {
       icon: SquarePen,

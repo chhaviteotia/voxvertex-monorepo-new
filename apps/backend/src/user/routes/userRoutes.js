@@ -115,8 +115,15 @@ router.get("/me", authenticateUser, getCurrentUserController);
 router.get("/:userType/me", authenticateUser, getCurrentUserController);
 
 /**
+ * @route   POST /api/auth/logout
+ * @desc    Unified logout - clears all auth cookies for any user type
+ * @access  Private
+ */
+router.post("/logout", authenticateUser, logoutUserController);
+
+/**
  * @route   POST /api/user/:userType/logout
- * @desc    Logout user
+ * @desc    Logout user (backward compatibility - uses unified logout)
  * @access  Private
  */
 router.post("/:userType/logout", authenticateUser, logoutUserController);

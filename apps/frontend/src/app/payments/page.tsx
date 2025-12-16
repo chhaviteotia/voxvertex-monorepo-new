@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import { FiSearch, FiFileText, FiCreditCard, FiTrendingUp, FiDollarSign, FiLock } from "react-icons/fi";
 import { BsCreditCard2Front, BsBank } from "react-icons/bs";
 import { HiOutlineCurrencyRupee } from "react-icons/hi";
@@ -13,6 +15,7 @@ import InvoiceModal from "./components/InvoiceModal";
  * Displays payments, earnings, VoxCoins purchase, and transaction history
  */
 export default function PaymentsPage() {
+  // Authentication is handled by ProtectedRoute in layout
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("Card");
   const [amount, setAmount] = useState("");
   const [searchQuery, setSearchQuery] = useState("");

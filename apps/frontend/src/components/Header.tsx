@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, Settings, LogOut, Menu } from "lucide-react";
-import { useExpertAuth } from "@/store/hooks/expertAuth";
+import { Bell, Settings, Menu } from "lucide-react";
+import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
+import UserDropdown from "./UserDropdown";
 
 interface HeaderProps {
   title?: string;
@@ -12,7 +13,7 @@ interface HeaderProps {
 
 /**
  * Header Component
- * Common header with notification, settings, and logout icons
+ * Common header with notification, settings, and user dropdown
  */
 export default function Header({
   title = "Profile",
@@ -20,16 +21,17 @@ export default function Header({
   onMobileMenuToggle,
 }: HeaderProps) {
   const router = useRouter();
-  const { logout } = useExpertAuth();
+  const { logout: authLogout, isAuthenticated } = useAuth();
+  const { data: currentUserData } = useGetCurrentUserQuery();
+
+  const displayUser = currentUserData?.user;
+  const userName = displayUser?.fullName || displayUser?.firstName || displayUser?.email?.split("@")[0] || "User";
+  // Show as logged in if user data is present (cookies might be set even if Redux state isn't updated yet)
+  const isLoggedIn = !!displayUser || isAuthenticated;
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      router.push("/");
-    } catch (error) {
-      console.error("Logout error:", error);
-      router.push("/");
-    }
+    // Use unified logout for all user types
+    await authLogout();
   };
 
   return (
@@ -53,7 +55,7 @@ export default function Header({
         </h1>
       </div>
 
-      {/* Right Side - Icons: Bell, Settings, Logout */}
+      {/* Right Side - Icons: Bell, Settings, User Dropdown */}
       <div className="flex items-center gap-4 sm:gap-6">
         {/* Notification Bell with Orange Badge */}
         <button
@@ -74,14 +76,10 @@ export default function Header({
           <Settings className="w-5 h-5 text-teal-500" />
         </button>
 
-        {/* Logout Icon */}
-        <button
-          onClick={handleLogout}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          aria-label="Logout"
-        >
-          <LogOut className="w-5 h-5 text-orange-500" />
-        </button>
+        {/* User Dropdown */}
+        {isLoggedIn && (
+          <UserDropdown userName={userName} onLogout={handleLogout} />
+        )}
       </div>
     </header>
   );

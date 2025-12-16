@@ -6,6 +6,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useLoginExpertMutation } from "@/store/api/expertApi";
+import { useAppDispatch } from "@/store/hooks";
+import { fetchCurrentUser } from "@/store/slices/authSlice";
 import { toast } from "react-hot-toast";
 
 // Dynamic import for ImageCarousel
@@ -28,6 +30,7 @@ export default function LoginPage() {
   const [localError, setLocalError] = useState("");
 
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [loginExpert, { isLoading: isLoggingIn }] = useLoginExpertMutation();
 
   const isFormValid =
@@ -47,6 +50,17 @@ export default function LoginPage() {
       }).unwrap();
 
       toast.success("Login successful!");
+
+      // Fetch current user to update auth state
+      try {
+        await dispatch(fetchCurrentUser()).unwrap();
+      } catch (error) {
+        console.error("Failed to fetch user after login:", error);
+        // Continue anyway - cookies are set
+      }
+
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Redirect based on response - backend provides redirectUrl
       if (result.redirectUrl) {

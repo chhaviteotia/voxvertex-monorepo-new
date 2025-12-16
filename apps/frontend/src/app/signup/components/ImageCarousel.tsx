@@ -50,26 +50,6 @@ export default function ImageCarousel() {
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Voxvertex Logo */}
-      <div className="absolute top-6 left-6 z-20 flex items-center gap-2">
-        <div className="w-8 h-8 bg-green-500 rounded flex items-center justify-center">
-          <svg
-            className="w-5 h-5 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-        </div>
-        <span className="text-white text-lg font-semibold">Voxvertex</span>
-      </div>
-
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide}

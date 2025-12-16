@@ -681,12 +681,84 @@ export const getCurrentUserController = asyncHandler(async (req, res) => {
 });
 
 /**
- * Logout user
- * POST /api/user/:userType/logout
+ * Unified Logout Controller
+ * Clears all authentication cookies regardless of user type
+ * POST /api/auth/logout or POST /api/user/:userType/logout
  */
 export const logoutUserController = asyncHandler(async (req, res) => {
-  const { userType } = req.params;
-  clearAuthCookies(res, userType);
+  // Clear all possible auth cookies (for all user types)
+  const clearConfig = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  };
+  
+  // Clear regular auth cookies
+  res.clearCookie("accessToken", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  res.clearCookie("refreshToken", clearConfig);
+  res.clearCookie("token", {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  res.clearCookie("userRole", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  
+  // Clear expert auth cookies
+  res.clearCookie("expertAccessToken", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  res.clearCookie("expertRefreshToken", clearConfig);
+  res.clearCookie("expertRole", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  
+  // Clear organiser auth cookies (if they exist)
+  res.clearCookie("organiserAccessToken", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  res.clearCookie("organiserRefreshToken", clearConfig);
+  res.clearCookie("organiserRole", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  
+  // Clear trainer auth cookies (if they exist)
+  res.clearCookie("trainerAccessToken", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  res.clearCookie("trainerRefreshToken", clearConfig);
+  res.clearCookie("trainerRole", {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
+    path: '/',
+  });
+  
   sendSuccess(res, null, "Logout successful");
 });
 

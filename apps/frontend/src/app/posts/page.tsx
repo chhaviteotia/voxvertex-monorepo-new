@@ -1,13 +1,17 @@
 "use client";
 
 import React from "react";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import PostsPage from "./components/PostsPage";
-import { useExpertAuth } from "@/store/hooks/expertAuth";
 
 export default function PostsPageRoute() {
-  const { user } = useExpertAuth();
+  const { data: currentUserData } = useGetCurrentUserQuery();
+  const user = currentUserData?.user;
 
-  // Handle case where user might not be loaded yet or API fails
-  // PostsPage will handle undefined user gracefully
-  return <PostsPage user={user || undefined} />;
+  return (
+    <ProtectedRoute redirectTo="/login">
+      <PostsPage user={user || undefined} />
+    </ProtectedRoute>
+  );
 }

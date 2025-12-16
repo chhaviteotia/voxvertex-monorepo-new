@@ -9,7 +9,7 @@ import {
   FiEdit,
 } from "react-icons/fi";
 import { toast } from "react-hot-toast";
-import { useDeletePostMutation } from "@/store/slices/postsSlice";
+import { useDeletePostMutation, useUpdatePostMutation } from "@/store/slices/postsSlice";
 
 // Post content component with read more functionality
 const PostContent = ({
@@ -143,8 +143,9 @@ const PostMenu = ({
   );
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Use Redux mutation for delete
+  // Use Redux mutations for delete and update
   const [deletePost] = useDeletePostMutation();
+  const [updatePost] = useUpdatePostMutation();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -203,35 +204,18 @@ const PostMenu = ({
         finalContent = editContent.substring(0, 2000).trim();
       }
 
-      // Use the correct backend endpoint for updating posts
-      const apiUrl = `${
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-      }/post/${postId}`;
-      const response = await fetch(apiUrl, {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          caption: finalContent,
-          content: finalContent,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update post");
-      }
-
-      const result = await response.json();
+      // Use RTK Query mutation for updating posts
+      const result = await updatePost({
+        postId,
+        content: finalContent,
+      }).unwrap();
 
       setIsEditing(false);
       setIsUpdating(false);
 
       // Call onEdit callback with updated post
-      if (result.success && result.post) {
-        onEdit(postId, result.post);
+      if (result.success && result.data) {
+        onEdit(postId, result.data);
         if (wasTruncated) {
           toast.success(
             "Post updated successfully! (Content was shortened to fit the limit)",
@@ -241,11 +225,12 @@ const PostMenu = ({
           toast.success("Post updated successfully");
         }
       } else {
-        throw new Error("Failed to update post");
+        throw new Error(result.message || "Failed to update post");
       }
     } catch (error: any) {
       console.error("Error updating post:", error);
-      toast.error(error.message || "Failed to update post");
+      const errorMessage = error?.data?.message || error?.message || "Failed to update post";
+      toast.error(errorMessage);
       setIsUpdating(false);
     }
   };

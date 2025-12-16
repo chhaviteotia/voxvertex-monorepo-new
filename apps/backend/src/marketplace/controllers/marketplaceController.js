@@ -11,17 +11,53 @@ export const getExpertsController = asyncHandler(async (req, res) => {
     const {
       search,
       role,
+      roles, // Array of roles (comma-separated or array)
       industry,
+      industries, // Array of industries (comma-separated or array)
+      expertise, // Array of expertise (comma-separated or array)
+      sessionTypes, // Array of session types (comma-separated or array)
+      sessionFormats, // Array of session formats (comma-separated or array)
+      sessionDurations, // Array of session durations (comma-separated or array)
+      audienceTypes, // Array of audience types (comma-separated or array)
+      languages, // Array of languages (comma-separated or array)
+      availability, // Array of availability options (comma-separated or array)
+      ratings, // Array of ratings (comma-separated or array)
+      experienceLevels, // Array of experience levels (comma-separated or array)
+      verificationStatus, // Array of verification statuses (comma-separated or array)
+      priceMin,
+      priceMax,
       country,
       city,
       limit = 50,
       skip = 0,
     } = req.query;
 
+    // Helper function to parse array from query (supports both comma-separated strings and arrays)
+    const parseArray = (value) => {
+      if (!value) return undefined;
+      if (Array.isArray(value)) return value;
+      if (typeof value === "string") return value.split(",").map((v) => v.trim()).filter(Boolean);
+      return [value];
+    };
+
     const filters = {
       search,
-      role,
-      industry,
+      role, // Backward compatibility
+      roles: parseArray(roles) || (role ? [role] : undefined),
+      industry, // Backward compatibility
+      industries: parseArray(industries) || (industry ? [industry] : undefined),
+      expertise: parseArray(expertise),
+      sessionTypes: parseArray(sessionTypes),
+      sessionFormats: parseArray(sessionFormats),
+      sessionDurations: parseArray(sessionDurations),
+      audienceTypes: parseArray(audienceTypes),
+      languages: parseArray(languages),
+      availability: parseArray(availability),
+      ratings: parseArray(ratings),
+      experienceLevels: parseArray(experienceLevels),
+      verificationStatus: parseArray(verificationStatus),
+      priceMin: priceMin ? parseFloat(priceMin) : undefined,
+      priceMax: priceMax ? parseFloat(priceMax) : undefined,
       country,
       city,
       limit: parseInt(limit),
@@ -29,7 +65,15 @@ export const getExpertsController = asyncHandler(async (req, res) => {
     };
 
     const experts = await getAllExperts(filters);
-    const total = await getExpertCount(filters);
+    // For count, use simpler filters (without complex profile-based filters)
+    const countFilters = {
+      search,
+      role,
+      industry,
+      country,
+      city,
+    };
+    const total = await getExpertCount(countFilters);
 
     return sendSuccess(
       res,

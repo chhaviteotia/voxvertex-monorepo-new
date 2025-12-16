@@ -26,10 +26,21 @@ export default function Footer() {
                 style={{ background: "transparent" }}
               >
                 <img
-                  src="/voxvertex-logo.png"
+                  src="/voxvertex-logo.jpeg"
                   alt="VoxVertex Logo"
                   className="h-16 w-auto object-contain block"
                   style={{ background: "transparent", padding: 0, margin: 0 }}
+                  onError={(e) => {
+                // Fallback to text if image fails to load
+                e.currentTarget.style.display = "none";
+                const parent = e.currentTarget.parentElement;
+                if (parent && !parent.querySelector(".logo-text-fallback")) {
+                  const textFallback = document.createElement("span");
+                  textFallback.className = "logo-text-fallback text-2xl font-bold text-[#FF6B35]";
+                  textFallback.textContent = "VV";
+                  parent.appendChild(textFallback);
+                }
+              }}
                 />
               </div>
             </div>

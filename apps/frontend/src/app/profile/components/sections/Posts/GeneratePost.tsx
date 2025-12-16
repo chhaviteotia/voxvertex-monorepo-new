@@ -4,10 +4,9 @@ import { FiImage, FiFileText, FiX } from "react-icons/fi";
 import { LiaTelegramPlane } from "react-icons/lia";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { useAuth } from "@/store/hooks";
+import { useAuth, useGetCurrentUserQuery } from "@/store/hooks";
 import {
   useCreatePostMutation,
-  useCreatePostWithMediaMutation,
 } from "@/store/slices/postsSlice";
 
 interface GeneratePostProps {
@@ -66,14 +65,21 @@ const GeneratePost = ({ onPost }: GeneratePostProps) => {
   const [error, setError] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<(string | null)[]>([]);
+  const [postType, setPostType] = useState<string>("article"); // For trainer posts
+  const [tagsInput, setTagsInput] = useState<string>(""); // For trainer posts (comma-separated)
   const [createPost, { isLoading: isCreatingPost }] = useCreatePostMutation();
-  const [createPostWithMedia, { isLoading: isUploadingMedia }] =
-    useCreatePostWithMediaMutation();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const auth = useAuth();
+  const { data: currentUserData } = useGetCurrentUserQuery();
+  
+  // Determine user role
+  const userRole = auth.user?.role || currentUserData?.user?.role || "";
+  const isTrainer = userRole === "trainer";
+  const isSpeaker = userRole === "speaker";
+  const isOrganiser = userRole === "organiser" || userRole === "organizer";
 
-  const isUploading = isCreatingPost || isUploadingMedia;
+  const isUploading = isCreatingPost;
 
   // Handle file selection
   const handleFileSelect = (
@@ -197,86 +203,62 @@ const GeneratePost = ({ onPost }: GeneratePostProps) => {
         finalContent = finalContent.substring(0, 2000).trim();
       }
 
-      // If files are selected, use createPostWithMedia
-      if (selectedFiles.length > 0) {
-        const formData = new FormData();
-
-        // Add text content if provided
-        if (finalContent) {
-          formData.append("content", finalContent);
-          formData.append("caption", finalContent);
-        } else {
-          // Even if no text, send empty strings to satisfy backend validation
-          formData.append("content", "");
-          formData.append("caption", "");
-        }
-
-        formData.append("visibility", "public");
-        formData.append("category", "general");
-
-        // Append all files with the same field name 'media'
-        selectedFiles.forEach((file) => {
-          formData.append("media", file);
-        });
-
-        console.log("📤 Uploading post with media:", {
-          hasContent: !!finalContent,
-          filesCount: selectedFiles.length,
-          fileNames: selectedFiles.map((f) => f.name),
-        });
-
-        const result = await createPostWithMedia(formData).unwrap();
-
-        if (result.success && result.data) {
-          const formattedPost = {
-            ...result.data,
-            date: new Date(
-              result.data.createdAt || Date.now()
-            ).toLocaleString(),
-            likes: result.data.likesCount || 0,
-            comments: result.data.commentsCount || 0,
-            content: result.data.caption,
-            caption: result.data.caption,
-            _id: result.data._id,
-          };
-
-          onPost(formattedPost);
-          setContent("");
-          setSelectedFiles([]);
-          setFilePreviews([]);
-          toast.success("Post created successfully!");
-        } else {
-          throw new Error("Failed to create post");
-        }
+      // Extract hashtags - for trainers, use comma-separated tags input; for others, extract from content
+      let hashtags: string[] = [];
+      if (isTrainer && tagsInput.trim()) {
+        // For trainers: use comma-separated tags
+        hashtags = tagsInput
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0);
       } else {
-        // No files, use regular createPost (text-only)
-        console.log("📤 Creating text-only post:", { content: finalContent });
+        // For speaker/organiser: extract hashtags from content
+        const hashtagRegex = /#(\w+)/g;
+        hashtags = finalContent.match(hashtagRegex)?.map(tag => tag.substring(1)) || [];
+      }
 
-        const result = await createPost({
-          content: finalContent,
-          visibility: "public",
-          category: "general",
-        }).unwrap();
+      // For now, we'll create text-only posts
+      // File upload support will be added later when backend supports it
+      if (selectedFiles.length > 0 && !isTrainer) {
+        toast.info("File upload feature is coming soon. Creating text post for now.");
+      }
 
-        if (result.success && result.data) {
-          const formattedPost = {
-            ...result.data,
-            date: new Date(
-              result.data.createdAt || Date.now()
-            ).toLocaleString(),
-            likes: result.data.likesCount || 0,
-            comments: result.data.commentsCount || 0,
-            content: result.data.caption,
-            caption: result.data.caption,
-            _id: result.data._id,
-          };
+      console.log("📤 Creating post:", { 
+        content: finalContent, 
+        type: isTrainer ? postType : "article",
+        hashtags,
+        role: userRole 
+      });
 
-          onPost(formattedPost);
-          setContent("");
-          toast.success("Post created successfully!");
-        } else {
-          throw new Error("Failed to create post");
-        }
+      const result = await createPost({
+        content: finalContent,
+        type: isTrainer ? postType : "article",
+        hashtags,
+      }).unwrap();
+
+      if (result.success && result.data) {
+        const postData = result.data;
+        const formattedPost = {
+          ...postData,
+          date: new Date(
+            postData.createdAt || Date.now()
+          ).toLocaleString(),
+          likes: postData.metrics?.likes || postData.likesCount || 0,
+          comments: postData.metrics?.comments || postData.commentsCount || 0,
+          content: postData.content || postData.caption || "",
+          caption: postData.content || postData.caption || "",
+          _id: postData._id,
+        };
+
+        onPost(formattedPost);
+        setContent("");
+        setSelectedFiles([]);
+        setFilePreviews([]);
+        setTagsInput(""); // Reset tags for trainer
+        setPostType("article"); // Reset post type for trainer
+        toast.success("Post created successfully!");
+      } else {
+        throw new Error(result.message || "Failed to create post");
       }
     } catch (err: any) {
       console.error("❌ Error creating post:", err);
@@ -292,12 +274,38 @@ const GeneratePost = ({ onPost }: GeneratePostProps) => {
       onSubmit={handleSubmit}
       className="p-6 border-b border-gray-200 space-y-4"
     >
+      {/* Trainer-specific: Post Type Selection */}
+      {isTrainer && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Post Type
+          </label>
+          <select
+            value={postType}
+            onChange={(e) => setPostType(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B35] focus:border-[#FF6B35] outline-none"
+            disabled={isUploading}
+          >
+            <option value="article">Article</option>
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="celebrate">Celebrate</option>
+            <option value="insight">Insight</option>
+            <option value="event">Announce Event</option>
+          </select>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="bg-[rgba(255,107,53,0.05)] border border-[#FF6B35] rounded-2xl p-5">
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="What's on your mind? Share insights, achievements, or professional updates..."
+          placeholder={
+            isTrainer
+              ? "What's on your mind? Share insights, achievements, or professional updates..."
+              : "What's on your mind? Share insights, achievements, or professional updates..."
+          }
           className="w-full bg-transparent outline-none resize-none text-[#FF6B35] placeholder-[#FF6B35]/70 text-base h-[120px] break-words overflow-wrap-anywhere"
           disabled={isUploading}
           maxLength={2000}
@@ -318,6 +326,26 @@ const GeneratePost = ({ onPost }: GeneratePostProps) => {
           </span>
         </div>
       </div>
+
+      {/* Trainer-specific: Comma-separated Tags Input */}
+      {isTrainer && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tags (comma-separated)
+          </label>
+          <input
+            type="text"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="e.g., leadership, training, coaching"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF6B35] focus:border-[#FF6B35] outline-none"
+            disabled={isUploading}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Separate multiple tags with commas
+          </p>
+        </div>
+      )}
 
       {/* File Previews */}
       {selectedFiles.length > 0 && (

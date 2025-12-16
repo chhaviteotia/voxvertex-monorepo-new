@@ -109,13 +109,19 @@ export const resendOtpRequest = createAsyncThunk<
 
 // Fetch current user from API
 export const fetchCurrentUser = createAsyncThunk<
-  { success: boolean; user: Record<string, unknown> },
+  { success: boolean; user: Record<string, unknown> | null },
   void,
   { rejectValue: string }
 >("auth/fetchCurrentUser", async (_, { rejectWithValue }) => {
   try {
     const { getCurrentUser } = await import("@/services/authService");
     const user = await getCurrentUser();
+    
+    // If no user returned, treat as not authenticated
+    if (!user) {
+      return rejectWithValue("No user data available");
+    }
+    
     return { success: true, user };
   } catch (error) {
     const message =
@@ -197,8 +203,10 @@ const authSlice = createSlice({
       state.signupStatus = "idle";
       state.loginError = null;
       state.signupError = null;
-      state.fetchUserStatus = "idle";
-      state.fetchUserError = null;
+      // Set fetchUserStatus to "failed" instead of "idle" to prevent refetching after logout
+      // This ensures useGetCurrentUserQuery won't try to refetch
+      state.fetchUserStatus = "failed";
+      state.fetchUserError = "User logged out";
     },
     updateUserBio(state, action: PayloadAction<string>) {
       if (state.user) {
@@ -327,10 +335,19 @@ const authSlice = createSlice({
         state.fetchUserError = null;
       })
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
-        state.fetchUserStatus = "succeeded";
-        state.user = action.payload.user;
-        state.isAuthenticated = true;
-        state.fetchUserError = null;
+        // Only update if we actually got a user
+        if (action.payload?.user) {
+          state.fetchUserStatus = "succeeded";
+          state.user = action.payload.user;
+          state.isAuthenticated = true;
+          state.fetchUserError = null;
+        } else {
+          // No user returned - treat as failed
+          state.fetchUserStatus = "failed";
+          state.isAuthenticated = false;
+          state.user = null;
+          state.fetchUserError = "No user data returned";
+        }
       })
       .addCase(fetchCurrentUser.rejected, (state, action) => {
         state.fetchUserStatus = "failed";

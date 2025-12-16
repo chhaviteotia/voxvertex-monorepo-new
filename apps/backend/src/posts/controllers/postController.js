@@ -1,6 +1,7 @@
 import {
   createPost,
   getUserPosts,
+  getAllPosts,
   getPostById,
   updatePost,
   deletePost,
@@ -52,6 +53,34 @@ export const createPostController = asyncHandler(async (req, res) => {
     return sendSuccess(res, { post }, "Post created successfully", 201);
   } catch (error) {
     return sendError(res, error.message || "Failed to create post", 400);
+  }
+});
+
+/**
+ * Get all published posts from all users (for community page)
+ * GET /api/posts/community
+ */
+export const getAllPostsController = asyncHandler(async (req, res) => {
+  const {
+    type,
+    page = 1,
+    limit = 20,
+    search,
+    sortBy = "recent",
+  } = req.query;
+
+  try {
+    const result = await getAllPosts({
+      type,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search,
+      sortBy,
+    });
+
+    return sendSuccess(res, result, "Posts retrieved successfully");
+  } catch (error) {
+    return sendError(res, error.message || "Failed to retrieve posts", 400);
   }
 });
 

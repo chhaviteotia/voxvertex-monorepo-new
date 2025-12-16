@@ -83,7 +83,7 @@ export const postsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getMyPosts: builder.query<Post[], void>({
       query: () => ({
-        url: '/post/my-posts',
+        url: '/posts/my-posts',
       }),
       providesTags: ['Post'],
       transformResponse: (response: any) => {
@@ -107,9 +107,32 @@ export const postsApi = baseApi.injectEndpoints({
         return [];
       },
     }),
+
+    getAllPosts: builder.query<Post[], { page?: number; limit?: number; search?: string; sortBy?: string; type?: string }>({
+      query: (params = {}) => ({
+        url: '/posts/community',
+        params,
+      }),
+      providesTags: ['Post'],
+      transformResponse: (response: any) => {
+        // Handle different response formats
+        if (Array.isArray(response)) {
+          return response;
+        }
+        if (response.success && response.data) {
+          if (response.data.posts && Array.isArray(response.data.posts)) {
+            return response.data.posts;
+          }
+          if (Array.isArray(response.data)) {
+            return response.data;
+          }
+        }
+        return [];
+      },
+    }),
     
     getPostById: builder.query<ApiResponse<Post>, string>({
-      query: (postId) => `/post/${postId}`,
+      query: (postId) => `/posts/${postId}`,
       providesTags: (result, error, id) => [{ type: 'Post', id }],
       transformResponse: (response: any) => {
         if (response.success && response.post) {
@@ -119,14 +142,24 @@ export const postsApi = baseApi.injectEndpoints({
       },
     }),
     
-    createPost: builder.mutation<ApiResponse<Post>, { content: string; visibility?: string; category?: string }>({
+    createPost: builder.mutation<ApiResponse<Post>, { content: string; visibility?: string; category?: string; type?: string; hashtags?: string[] }>({
       query: (postData) => ({
-        url: '/post/create',
+        url: '/posts',
         method: 'POST',
-        body: postData,
+        body: {
+          content: postData.content,
+          type: postData.type || 'article',
+          hashtags: postData.hashtags || [],
+          status: 'published',
+        },
       }),
       invalidatesTags: ['Post'],
       transformResponse: (response: any) => {
+        // Backend returns { success: true, data: { post: {...} } }
+        if (response.success && response.data?.post) {
+          return { success: true, data: response.data.post };
+        }
+        // Fallback for different response format
         if (response.success && response.post) {
           return { success: true, data: response.post };
         }
@@ -136,7 +169,7 @@ export const postsApi = baseApi.injectEndpoints({
     
     createPostWithMedia: builder.mutation<ApiResponse<Post>, FormData>({
       query: (formData) => ({
-        url: '/post/create-with-media',
+        url: '/posts/create-with-media',
         method: 'POST',
         body: formData,
       }),
@@ -151,13 +184,71 @@ export const postsApi = baseApi.injectEndpoints({
     
     deletePost: builder.mutation<ApiResponse<{ message: string }>, string>({
       query: (postId) => ({
-        url: `/post/${postId}`,
+        url: `/posts/${postId}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Post'],
       transformResponse: (response: any) => {
         if (response.success) {
           return { success: true, data: { message: response.message || 'Post deleted successfully' } };
+        }
+        return { success: false };
+      },
+    }),
+
+    toggleLikePost: builder.mutation<ApiResponse<Post>, string>({
+      query: (postId) => ({
+        url: `/posts/${postId}/like`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Post'],
+      transformResponse: (response: any) => {
+        if (response.success && response.data?.post) {
+          return { success: true, data: response.data.post };
+        }
+        return { success: false };
+      },
+    }),
+
+    addComment: builder.mutation<ApiResponse<Post>, { postId: string; content: string }>({
+      query: ({ postId, content }) => ({
+        url: `/posts/${postId}/comments`,
+        method: 'POST',
+        body: { content },
+      }),
+      invalidatesTags: ['Post'],
+      transformResponse: (response: any) => {
+        // Backend returns { success: true, data: { post: {...} } }
+        if (response.success && response.data?.post) {
+          return { success: true, data: response.data.post };
+        }
+        // Fallback for different response format
+        if (response.success && response.post) {
+          return { success: true, data: response.post };
+        }
+        return { success: false };
+      },
+    }),
+
+    updatePost: builder.mutation<ApiResponse<Post>, { postId: string; content: string; type?: string; hashtags?: string[] }>({
+      query: ({ postId, ...updateData }) => ({
+        url: `/posts/${postId}`,
+        method: 'PUT',
+        body: {
+          content: updateData.content,
+          type: updateData.type,
+          hashtags: updateData.hashtags || [],
+        },
+      }),
+      invalidatesTags: ['Post'],
+      transformResponse: (response: any) => {
+        // Backend returns { success: true, data: { post: {...} } }
+        if (response.success && response.data?.post) {
+          return { success: true, data: response.data.post };
+        }
+        // Fallback for different response format
+        if (response.success && response.post) {
+          return { success: true, data: response.post };
         }
         return { success: false };
       },
@@ -180,10 +271,14 @@ export const {
 
 export const {
   useGetMyPostsQuery,
+  useGetAllPostsQuery,
   useGetPostByIdQuery,
   useCreatePostMutation,
   useCreatePostWithMediaMutation,
   useDeletePostMutation,
+  useUpdatePostMutation,
+  useToggleLikePostMutation,
+  useAddCommentMutation,
 } = postsApi;
 
 // Selectors

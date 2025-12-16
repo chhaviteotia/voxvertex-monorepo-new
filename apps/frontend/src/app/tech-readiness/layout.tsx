@@ -4,14 +4,13 @@ import { useEffect, Suspense, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 /**
- * Payments Layout - Clean layout matching the trainer profile UI
+ * Tech Readiness Layout - Clean layout matching the trainer profile UI
  * Sidebar on left, simple top header, content on right
  * Fully responsive
  */
-export default function PaymentsLayout({
+export default function TechReadinessLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -25,7 +24,7 @@ export default function PaymentsLayout({
   }, [pathname]);
 
   return (
-    <div className="antialiased overflow-x-hidden bg-gray-50 min-h-screen">
+    <div className="antialiased overflow-x-hidden bg-[#fffbf5] min-h-screen">
       {/* Mobile Sidebar Overlay */}
       {showMobileSidebar && (
         <>
@@ -55,17 +54,13 @@ export default function PaymentsLayout({
         <div className="flex-1 w-full lg:ml-64 min-h-screen">
           {/* Top Header Bar - Matching the trainer profile design */}
           <Header
-            title="Payments"
+            title="AI Tech Readiness"
             showMobileMenu={showMobileSidebar}
             onMobileMenuToggle={() => setShowMobileSidebar(true)}
           />
 
           {/* Content with top margin for header */}
-          <main className="mt-16 p-4 sm:p-6 lg:p-8">
-            <ProtectedRoute redirectTo="/login">
-              {children}
-            </ProtectedRoute>
-          </main>
+          <main className="mt-16 p-4 sm:p-6 lg:p-8">{children}</main>
         </div>
       </div>
     </div>
